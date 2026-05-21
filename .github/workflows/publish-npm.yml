@@ -1,0 +1,46 @@
+name: Publish npm Package
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/publish-npm.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      registry-url:
+        description: "npm registry URL"
+        type: string
+        default: "https://npm.pkg.github.com"
+      scope:
+        description: "npm scope"
+        type: string
+        default: "@brainxio"
+      node-version:
+        description: "Node.js version"
+        type: string
+        default: "20"
+      package-manager:
+        description: "Package manager: npm, pnpm, or yarn"
+        type: string
+        default: "npm"
+
+jobs:
+  publish:
+    name: Build and Publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: ${{ inputs.node-version }}
+          registry-url: ${{ inputs.registry-url }}
+          scope: ${{ inputs.scope }}
+
+      - run: npm run build
+
+      - run: npm publish  # zizmor: ignore[use-trusted-publishing] — GitHub Packages npm registry requires NODE_AUTH_TOKEN; trusted publishing via OIDC not supported
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

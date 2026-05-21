@@ -1,0 +1,95 @@
+name: Rust CI
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/ci-rust.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      toolchain:
+        description: "Rust toolchain version"
+        type: string
+        default: "1.87.0"
+      clippy-deny-warnings:
+        description: "Treat clippy warnings as errors"
+        type: boolean
+        default: true
+      run-audit:
+        description: "Run cargo audit for vulnerability scanning"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: ${{ inputs.toolchain }}
+
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy Lints
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: ${{ inputs.toolchain }}
+
+      - name: Run clippy
+        shell: bash
+        env:
+          DENY_WARNINGS: ${{ inputs.clippy-deny-warnings }}
+        run: |
+          case "$DENY_WARNINGS" in
+            true|false|True|False|TRUE|FALSE|1|0|yes|no|Yes|No|YES|NO) ;;
+            *) echo "ERROR: invalid boolean value for clippy-deny-warnings: $DENY_WARNINGS" >&2; exit 1 ;;
+          esac
+          if [ "$DENY_WARNINGS" = "true" ]; then
+            cargo clippy --all-targets -- -D warnings
+          else
+            cargo clippy --all-targets
+          fi
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: ${{ inputs.toolchain }}
+
+      - run: cargo test
+
+  build-release:
+    name: Build Release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: ${{ inputs.toolchain }}
+
+      - run: cargo build --release
+
+  audit:
+    name: Security Audit
+    if: ${{ inputs.run-audit }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: ${{ inputs.toolchain }}
+
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
