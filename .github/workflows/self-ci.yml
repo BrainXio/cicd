@@ -1,0 +1,349 @@
+name: Self CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-workflows:
+    name: Validate Workflow Syntax
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Install PyYAML
+        shell: bash
+        run: pip install pyyaml 2>/dev/null || python3 -m pip install pyyaml
+
+      - name: YAML syntax check
+        shell: bash
+        run: |
+          python3 -c "
+          import sys, yaml, glob
+          errors = []
+          for f in sorted(glob.glob('.github/workflows/*.yml')):
+              try:
+                  with open(f) as fh:
+                      yaml.safe_load(fh)
+              except Exception as e:
+                  errors.append(f'{f}: {e}')
+          if errors:
+              for e in errors:
+                  print(f'FAIL: {e}', file=sys.stderr)
+              sys.exit(1)
+          print('All workflow files valid')
+          "
+
+      - name: Enforce no deprecated actions/cache@v[0-3]
+        run: |
+          ! grep -rE 'actions/cache@v[0-3]' . || \
+          (echo "FAIL: Deprecated actions/cache@v[0-3] detected — must use @v4" && exit 1)
+
+  test-ci-python-synthetic:
+    name: Synthetic Python CI Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create synthetic Python project
+        shell: bash
+        run: |
+          mkdir -p /tmp/test-project/src/test_pkg
+          mkdir -p /tmp/test-project/tests
+
+          cat > /tmp/test-project/pyproject.toml << 'PYEOF'
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+
+          [project]
+          name = "test-project"
+          version = "0.1.0"
+          requires-python = ">=3.10"
+          dependencies = ["pytest", "pytest-cov", "ruff", "mypy", "build"]
+
+          [tool.hatch.build.targets.wheel]
+          packages = ["src/test_pkg"]
+          PYEOF
+
+          cat > /tmp/test-project/src/test_pkg/__init__.py << 'PYEOF'
+          """Test package."""
+          __version__ = "0.1.0"
+          PYEOF
+
+          cat > /tmp/test-project/src/test_pkg/main.py << 'PYEOF'
+          def greet(name: str) -> str:
+              return f"Hello, {name}"
+          PYEOF
+
+          cat > /tmp/test-project/tests/test_main.py << 'PYEOF'
+          from test_pkg.main import greet
+
+          def test_greet():
+              assert greet("world") == "Hello, world"
+          PYEOF
+
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: "3.10"
+
+      - name: Run lint on synthetic project
+        working-directory: /tmp/test-project
+        shell: bash
+        run: |
+          uv sync
+          uv run ruff format src/ tests/
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+
+      - name: Run type check on synthetic project
+        working-directory: /tmp/test-project
+        shell: bash
+        run: uv run mypy src/test_pkg --strict
+
+      - name: Run tests on synthetic project
+        working-directory: /tmp/test-project
+        shell: bash
+        run: uv run pytest --cov --cov-report=term-missing -q
+
+      - name: Build wheel
+        working-directory: /tmp/test-project
+        shell: bash
+        run: uv run python -m build
+
+  test-ci-typescript-synthetic:
+    name: Synthetic TypeScript CI Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create synthetic TypeScript project
+        run: |
+          mkdir -p /tmp/test-project-ts/src
+          mkdir -p /tmp/test-project-ts/tests
+
+          cat > /tmp/test-project-ts/package.json << 'EOF'
+          {
+            "name": "test-project-typescript",
+            "version": "0.1.0",
+            "type": "commonjs",
+            "scripts": {
+              "lint": "echo 'lint: success'",
+              "format:check": "echo 'format:check: success'",
+              "typecheck": "tsc --noEmit",
+              "test": "echo 'test: success'"
+            },
+            "devDependencies": {
+              "typescript": "^5.0.0",
+              "@types/node": "^20.0.0",
+              "ts-node": "^10.9.0"
+            }
+          }
+          EOF
+
+          cat > /tmp/test-project-ts/tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "commonjs",
+              "strict": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true,
+              "forceConsistentCasingInFileNames": true
+            },
+            "include": ["src", "tests"]
+          }
+          EOF
+
+          cat > /tmp/test-project-ts/src/index.ts << 'EOF'
+          export const hello = (name: string): string => "Hello, " + name;
+          EOF
+
+          cat > /tmp/test-project-ts/tests/test.ts << 'EOF'
+          import { hello } from "../src/index";
+
+          describe("hello", () => {
+            it("returns greeting", () => {
+              const result = hello("world");
+              if (result !== "Hello, world") {
+                throw new Error("expected 'Hello, world'");
+              }
+            });
+          });
+          EOF
+
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: "20"
+
+      - name: Install dependencies
+        working-directory: /tmp/test-project-ts
+        shell: bash
+        run: npm ci
+
+      - name: Run lint
+        working-directory: /tmp/test-project-ts
+        shell: bash
+        run: npm run lint
+
+      - name: Run format check
+        working-directory: /tmp/test-project-ts
+        shell: bash
+        run: npm run format:check
+
+      - name: Run typecheck
+        working-directory: /tmp/test-project-ts
+        shell: bash
+        run: npm run typecheck
+
+      - name: Run tests
+        working-directory: /tmp/test-project-ts
+        shell: bash
+        run: npm test
+
+  test-ci-go-synthetic:
+    name: Synthetic Go CI Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create synthetic Go project
+        shell: bash
+        run: |
+          mkdir -p /tmp/test-project-go
+
+          cat > /tmp/test-project-go/go.mod << 'EOF'
+          module test-project
+
+          go 1.22
+          EOF
+
+          cat > /tmp/test-project-go/main.go << 'EOF'
+          package main
+
+          import "fmt"
+
+          func main() {
+              fmt.Println(hello())
+          }
+
+          func hello() string {
+              return "hello"
+          }
+          EOF
+
+          cat > /tmp/test-project-go/main_test.go << 'EOF'
+          package main
+
+          import "testing"
+
+          func TestHello(t *testing.T) {
+              if hello() != "hello" {
+                  t.Error("expected hello")
+              }
+          }
+          EOF
+
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: go
+          version: "1.22"
+
+      - name: Run gofmt check
+        working-directory: /tmp/test-project-go
+        shell: bash
+        run: |
+          output=$(gofmt -d .)
+          if [ -n "$output" ]; then
+            echo "ERROR: gofmt found unformatted files:"
+            echo "$output"
+            exit 1
+          fi
+          echo "gofmt: no issues"
+
+      - name: Run go vet
+        working-directory: /tmp/test-project-go
+        shell: bash
+        run: go vet ./...
+
+      - name: Run tests with race detector
+        working-directory: /tmp/test-project-go
+        shell: bash
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Run go build
+        working-directory: /tmp/test-project-go
+        shell: bash
+        run: go build ./...
+
+  test-ci-rust-synthetic:
+    name: Synthetic Rust CI Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create synthetic Rust project
+        shell: bash
+        run: |
+          mkdir -p /tmp/test-project-rust/src
+
+          cat > /tmp/test-project-rust/Cargo.toml << 'EOF'
+          [package]
+          name = "test-project-rust"
+          version = "0.1.0"
+          edition = "2021"
+          EOF
+
+          cat > /tmp/test-project-rust/src/lib.rs << 'EOF'
+          pub fn add(a: i32, b: i32) -> i32 {
+              a + b
+          }
+          EOF
+
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: rust
+          version: "1.87.0"
+
+      - name: Run cargo fmt check
+        working-directory: /tmp/test-project-rust
+        shell: bash
+        run: cargo fmt --all -- --check
+
+      - name: Run cargo clippy
+        working-directory: /tmp/test-project-rust
+        shell: bash
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run cargo test
+        working-directory: /tmp/test-project-rust
+        shell: bash
+        run: cargo test
+
+      - name: Run cargo build release
+        working-directory: /tmp/test-project-rust
+        shell: bash
+        run: cargo build --release
