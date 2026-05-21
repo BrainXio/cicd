@@ -43,23 +43,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
-        with:
-          enable-cache: true
-
-      - run: uv sync
+      - name: Install doc tools
+        run: |
+          python3 -m pip install --quiet mdformat mdformat-frontmatter mdformat-gfm yamllint
 
       - name: Run mdformat check
         shell: bash
         env:
           MD_PATHS: ${{ inputs.md-paths }}
-        run: uv run mdformat --check $MD_PATHS
+        run: mdformat --check $MD_PATHS
 
       - name: Run yamllint
         shell: bash
         env:
           YAML_PATHS: ${{ inputs.yaml-paths }}
-        run: uv run yamllint $YAML_PATHS
+        run: yamllint $YAML_PATHS
 
   typos:
     name: Spell Check
