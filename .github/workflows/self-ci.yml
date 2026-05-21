@@ -95,10 +95,10 @@ jobs:
               assert greet("world") == "Hello, world"
           PYEOF
 
-      - uses: brainxio/actions/common-setup@v1
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
-          language: python
-          version: "3.10"
+          python-version: "3.10"
+          enable-cache: true
 
       - name: Run lint on synthetic project
         working-directory: /tmp/test-project
@@ -187,10 +187,9 @@ jobs:
           });
           EOF
 
-      - uses: brainxio/actions/common-setup@v1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          language: node
-          version: "20"
+          node-version: "20"
 
       - name: Install dependencies
         working-directory: /tmp/test-project-ts
@@ -242,11 +241,11 @@ jobs:
           import "fmt"
 
           func main() {
-              fmt.Println(hello())
+          	fmt.Println(hello())
           }
 
           func hello() string {
-              return "hello"
+          	return "hello"
           }
           EOF
 
@@ -256,16 +255,15 @@ jobs:
           import "testing"
 
           func TestHello(t *testing.T) {
-              if hello() != "hello" {
-                  t.Error("expected hello")
-              }
+          	if hello() != "hello" {
+          		t.Error("expected hello")
+          	}
           }
           EOF
 
-      - uses: brainxio/actions/common-setup@v1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          language: go
-          version: "1.22"
+          go-version: "1.22"
 
       - name: Run gofmt check
         working-directory: /tmp/test-project-go
@@ -323,10 +321,9 @@ jobs:
           }
           EOF
 
-      - uses: brainxio/actions/common-setup@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          language: rust
-          version: "1.87.0"
+          components: clippy,rustfmt
 
       - name: Run cargo fmt check
         working-directory: /tmp/test-project-rust
