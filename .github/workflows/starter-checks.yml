@@ -24,9 +24,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
 
   merge-conflicts:
     name: Merge Conflict Check
@@ -39,9 +39,9 @@ jobs:
       - name: Scan for unresolved merge conflict markers
         shell: bash
         run: |
-          conflicts=$(git grep -lE '^(<<<<<<< |>>>>>>> |=======$)' \
-            -- '*.py' '*.ts' '*.tsx' '*.rs' '*.go' '*.yml' '*.yaml' \
-            '*.md' '*.toml' '*.json' '*.sh' '*.bash' '*.css' '*.html' \
+          conflicts=$(git grep -lE '^(<<<<<<< |>>>>>>> |=======$)' \\
+            -- '*.py' '*.ts' '*.tsx' '*.rs' '*.go' '*.yml' '*.yaml' \\
+            '*.md' '*.toml' '*.json' '*.sh' '*.bash' '*.css' '*.html' \\
             '*.tf' '*.hcl' '*.sql' '*.xml' 2>/dev/null || true)
           if [ -n "$conflicts" ]; then
             echo "ERROR: merge conflict markers found:"
