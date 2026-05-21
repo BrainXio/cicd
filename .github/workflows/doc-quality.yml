@@ -1,0 +1,91 @@
+name: Doc Quality
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/doc-quality.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      md-paths:
+        description: "Paths/globs for mdformat (space-separated)"
+        type: string
+        default: "."
+      yaml-paths:
+        description: "Paths for yamllint"
+        type: string
+        default: ".github"
+      typos-config:
+        description: "Path to .typos.toml (empty to skip typos check)"
+        type: string
+        default: ""
+      link-check-paths:
+        description: "Paths for lychee link check (empty to skip)"
+        type: string
+        default: ""
+      link-check-base:
+        description: "Base path for relative link resolution"
+        type: string
+        default: "."
+      link-check-fail:
+        description: "Fail workflow on broken links"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  doc-lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - name: Run mdformat check
+        shell: bash
+        env:
+          MD_PATHS: ${{ inputs.md-paths }}
+        run: uv run mdformat --check $MD_PATHS
+
+      - name: Run yamllint
+        shell: bash
+        env:
+          YAML_PATHS: ${{ inputs.yaml-paths }}
+        run: uv run yamllint $YAML_PATHS
+
+  typos:
+    name: Spell Check
+    if: ${{ inputs.typos-config != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: crate-ci/typos@6ac2ebd1b93eade61faf7e12688ad87a073fea59 # v1.46.0
+        with:
+          config: ${{ inputs.typos-config }}
+
+  link-check:
+    name: Link Check
+    if: ${{ inputs.link-check-paths != '' }}
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ !inputs.link-check-fail }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: lycheeverse/lychee-action@373c709c69115d41ff229c7e5df9f8788daa9553 # v2
+        with:
+          args: --base ${{ inputs.link-check-base }} ${{ inputs.link-check-paths }}
+          fail: ${{ inputs.link-check-fail }}
+          failIfEmpty: false

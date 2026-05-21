@@ -1,0 +1,129 @@
+name: Sync Defaults
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/sync-defaults.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      target-repo:
+        description: "Target repository to sync defaults to (e.g., BrainXio/myrepo)"
+        type: string
+        required: true
+      dry-run:
+        description: "Show changes without applying"
+        type: boolean
+        default: false
+      fail-on-drift:
+        description: "Fail if drift is detected instead of applying"
+        type: boolean
+        default: false
+      defaults-path:
+        description: "Path within this repo to the defaults directory"
+        type: string
+        default: "defaults"
+    secrets:
+      SYNC_TOKEN:
+        description: "GitHub token with repo and workflow scopes for the target repo"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Sync defaults to target repo
+        shell: bash
+        env:
+          TARGET_REPO: ${{ inputs.target-repo }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          FAIL_ON_DRIFT: ${{ inputs.fail-on-drift }}
+          DEFAULTS_PATH: ${{ inputs.defaults-path }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Validate inputs with regex to prevent injection
+          if ! [[ "$TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "ERROR: target-repo must match ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            exit 1
+          fi
+          if ! [[ "$DEFAULTS_PATH" =~ ^[A-Za-z0-9_./-]+$ ]]; then
+            echo "ERROR: defaults-path contains invalid characters"
+            exit 1
+          fi
+
+          if [[ ! -d "$DEFAULTS_PATH" ]]; then
+            echo "ERROR: defaults-path '$DEFAULTS_PATH' is not a directory"
+            exit 1
+          fi
+
+          DEFAULTS_PATH="${DEFAULTS_PATH%/}"
+          REPO_SLUG="${TARGET_REPO%%/*}"
+          REPO_NAME="${TARGET_REPO#*/}"
+
+          TEMP_DIR=$(mktemp -d)
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+
+          # Clone target repo
+          gh auth setup-git
+          gh repo clone "$TARGET_REPO" "$TEMP_DIR/$REPO_NAME" -- --depth 1
+
+          cd "$TEMP_DIR/$REPO_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          DEFAULT_BRANCH=$(gh repo view "$TARGET_REPO" --json defaultBranchRef --jq '.defaultBranchRef.name')
+          git checkout "$DEFAULT_BRANCH"
+
+          # Detect drift
+          DRIFT=0
+          for src_file in "$DEFAULTS_PATH"/*; do
+            [[ -f "$src_file" ]] || continue
+            filename=$(basename "$src_file")
+            if [[ -f "$filename" ]]; then
+              if ! diff -q "$src_file" "$filename" > /dev/null 2>&1; then
+                DRIFT=1
+                echo "DRIFT: $filename differs"
+                if [[ "$DRY_RUN" == "true" ]]; then
+                  diff -u "$filename" "$src_file" || true
+                fi
+              fi
+            else
+              DRIFT=1
+              echo "DRIFT: $filename is new"
+            fi
+          done
+
+          if [[ "$DRIFT" == "0" ]]; then
+            echo "No drift detected."
+            exit 0
+          fi
+
+          if [[ "$FAIL_ON_DRIFT" == "true" ]]; then
+            echo "Drift detected, failing as requested."
+            exit 1
+          fi
+
+          if [[ "$DRY_RUN" == "true" ]]; then
+            echo "Dry-run complete."
+            exit 0
+          fi
+
+          # Apply changes
+          for src_file in "$DEFAULTS_PATH"/*; do
+            [[ -f "$src_file" ]] || continue
+            filename=$(basename "$src_file")
+            cp "$src_file" "$filename"
+          done
+
+          git add -A
+          git commit -m "sync: update defaults from workflows repo"
+          git push origin "$DEFAULT_BRANCH"
+          echo "Defaults synced to $TARGET_REPO"

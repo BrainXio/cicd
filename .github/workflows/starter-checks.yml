@@ -1,0 +1,66 @@
+name: Starter Checks
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/starter-checks.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      check-commit-messages:
+        description: "Validate conventional commit messages"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  merge-conflicts:
+    name: Merge Conflict Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Scan for unresolved merge conflict markers
+        shell: bash
+        run: |
+          conflicts=$(git grep -lE '^(<<<<<<< |>>>>>>> |=======$)' \
+            -- '*.py' '*.ts' '*.tsx' '*.rs' '*.go' '*.yml' '*.yaml' \
+            '*.md' '*.toml' '*.json' '*.sh' '*.bash' '*.css' '*.html' \
+            '*.tf' '*.hcl' '*.sql' '*.xml' 2>/dev/null || true)
+          if [ -n "$conflicts" ]; then
+            echo "ERROR: merge conflict markers found:"
+            echo "$conflicts"
+            exit 1
+          fi
+          echo "No merge conflicts found"
+
+  commitlint:
+    name: Commit Message Check
+    if: ${{ inputs.check-commit-messages }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6
+        with:
+          failOnWarnings: true
+          helpURL: ""

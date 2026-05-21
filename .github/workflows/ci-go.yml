@@ -1,0 +1,68 @@
+name: Go CI
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/ci-go.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: "Go version"
+        type: string
+        default: "1.22"
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: go
+          version: ${{ inputs.go-version }}
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          diff=$(gofmt -d .)
+          if [ -n "$diff" ]; then
+            echo "$diff"
+            echo "ERROR: gofmt found formatting issues"
+            exit 1
+          fi
+
+  vet:
+    name: Go Vet
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: go
+          version: ${{ inputs.go-version }}
+
+      - run: go vet ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: go
+          version: ${{ inputs.go-version }}
+
+      - run: go test -race -coverprofile=coverage.out ./...
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: go
+          version: ${{ inputs.go-version }}
+
+      - run: go build ./...

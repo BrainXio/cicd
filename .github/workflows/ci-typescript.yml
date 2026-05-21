@@ -1,0 +1,96 @@
+name: TypeScript CI
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/ci-typescript.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version"
+        type: string
+        default: "20"
+      package-manager:
+        description: "Package manager: npm, pnpm, or yarn"
+        type: string
+        default: "npm"
+      lint-script:
+        description: "package.json lint script name"
+        type: string
+        default: "lint"
+      format-script:
+        description: "package.json format check script name"
+        type: string
+        default: "format:check"
+      typecheck-script:
+        description: "package.json typecheck script name"
+        type: string
+        default: "typecheck"
+      test-script:
+        description: "package.json test script name"
+        type: string
+        default: "test"
+      build-script:
+        description: "package.json build script name"
+        type: string
+        default: "build"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: ${{ inputs.node-version }}
+
+      - name: Run lint
+        shell: bash
+        run: ${{ inputs.package-manager }} run ${{ inputs.lint-script }}
+
+      - name: Run format check
+        shell: bash
+        run: ${{ inputs.package-manager }} run ${{ inputs.format-script }}
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: ${{ inputs.node-version }}
+
+      - name: Run typecheck
+        shell: bash
+        run: ${{ inputs.package-manager }} run ${{ inputs.typecheck-script }}
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: ${{ inputs.node-version }}
+
+      - name: Run tests
+        shell: bash
+        run: ${{ inputs.package-manager }} run ${{ inputs.test-script }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: node
+          version: ${{ inputs.node-version }}
+
+      - name: Run build
+        shell: bash
+        run: ${{ inputs.package-manager }} run ${{ inputs.build-script }}

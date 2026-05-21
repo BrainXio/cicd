@@ -1,0 +1,87 @@
+name: Auto-merge Dependabot PRs
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/dependabot-auto-merge.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      auto-merge-major-actions:
+        description: "Auto-merge major version bumps of GitHub Actions"
+        type: boolean
+        default: true
+
+jobs:
+  dependabot-auto-merge:
+    name: Auto-merge low-risk updates
+    if: ${{ github.triggering_actor == 'dependabot[bot]' }}  # zizmor: ignore[bot-conditions] — triggering_actor is non-spoofable
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Check if update is auto-mergeable
+        id: auto-mergeable
+        shell: bash
+        env:
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          ALLOW_MAJOR_ACTIONS: ${{ inputs.auto-merge-major-actions }}
+        run: |
+          case "$ALLOW_MAJOR_ACTIONS" in
+            true|false|True|False|TRUE|FALSE|1|0|yes|no|Yes|No|YES|NO) ;;
+            *) echo "ERROR: invalid boolean value: $ALLOW_MAJOR_ACTIONS" >&2; exit 1 ;;
+          esac
+          mergeable=false
+          if [ "$UPDATE_TYPE" = "version-update:semver-patch" ] || \
+             [ "$UPDATE_TYPE" = "version-update:semver-minor" ] || \
+             [ "$UPDATE_TYPE" = "version-update:semver-security-patch" ]; then
+            mergeable=true
+          elif [ "$UPDATE_TYPE" = "version-update:semver-major" ] && \
+               [ "$ECOSYSTEM" = "github_actions" ] && \
+               [ "$ALLOW_MAJOR_ACTIONS" = "true" ]; then
+            mergeable=true
+          fi
+          echo "result=$mergeable" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        if: steps.auto-mergeable.outputs.result == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Approve PR
+        if: steps.auto-mergeable.outputs.result == 'true'
+        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add visibility comment
+        if: steps.auto-mergeable.outputs.result == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Auto-merged low-risk Dependabot update\n' +
+                    '- Type: ' + process.env.UPDATE_TYPE + '\n' +
+                    '- Dependency: ' + process.env.DEPENDENCY_NAMES + '\n' +
+                    'Merging automatically once checks pass.'
+            })

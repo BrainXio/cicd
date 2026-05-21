@@ -1,0 +1,212 @@
+name: Python CI
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/ci-python.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version"
+        type: string
+        default: "3.10"
+      src-path:
+        description: "Source directory path"
+        type: string
+        default: "src"
+      test-path:
+        description: "Test directory path"
+        type: string
+        default: "tests"
+      mypy-target:
+        description: "Package for mypy (empty = auto-detect from src-path)"
+        type: string
+        default: ""
+      coverage-fail-under:
+        description: "Minimum coverage percentage"
+        type: number
+        default: 80
+      coverage-source:
+        description: "Coverage source path (empty = auto-detect from src-path)"
+        type: string
+        default: ""
+      run-mcp-integration:
+        description: "Run MCP integration tests"
+        type: boolean
+        default: false
+      mcp-test-path:
+        description: "Path for MCP integration tests"
+        type: string
+        default: "tests/mcp"
+      mcp-env-vars:
+        description: "Extra env vars for MCP tests (KEY=VALUE per line)"
+        type: string
+        default: ""
+      extra-deps:
+        description: "Extra uv sync dependency groups (comma-separated, alphanumeric/dash/underscore only)"
+        type: string
+        default: ""
+      wheel-entry-points:
+        description: "Expected entry point names in wheel (space-separated, empty skips check)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - name: Validate paths
+        shell: bash
+        env:
+          SRC_PATH: ${{ inputs.src-path }}
+          TEST_PATH: ${{ inputs.test-path }}
+        run: |
+          [[ "$SRC_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid src-path" >&2; exit 1; }
+          [[ "$TEST_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid test-path" >&2; exit 1; }
+          echo "SRC_PATH=$SRC_PATH" >> "$GITHUB_ENV"
+          echo "TEST_PATH=$TEST_PATH" >> "$GITHUB_ENV"
+
+      - name: Run ruff check
+        shell: bash
+        run: uv run ruff check "$SRC_PATH"/ "$TEST_PATH"/
+
+      - name: Run ruff format check
+        shell: bash
+        run: uv run ruff format --check "$SRC_PATH"/ "$TEST_PATH"/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - name: Determine mypy target
+        id: mypy-target
+        shell: bash
+        env:
+          MYPY_TARGET_INPUT: ${{ inputs.mypy-target }}
+          SRC_PATH: ${{ inputs.src-path }}
+        run: |
+          if [ -n "$MYPY_TARGET_INPUT" ]; then
+            if [[ ! "$MYPY_TARGET_INPUT" =~ ^[a-zA-Z0-9_/.-]+$ ]]; then
+              echo "ERROR: mypy-target input contains invalid characters: $MYPY_TARGET_INPUT" >&2
+              exit 1
+            fi
+            echo "target=$MYPY_TARGET_INPUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=$SRC_PATH" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run mypy
+        shell: bash
+        env:
+          MYPY_TARGET: ${{ steps.mypy-target.outputs.target }}
+        run: uv run mypy "$MYPY_TARGET" --strict
+
+  test:
+    name: Test and Coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - name: Run tests with coverage
+        shell: bash
+        env:
+          COVERAGE_SOURCE: ${{ inputs.coverage-source }}
+          COVERAGE_FAIL_UNDER: ${{ inputs.coverage-fail-under }}
+        run: |
+          if [ -n "$COVERAGE_SOURCE" ]; then
+            uv run pytest --cov="$COVERAGE_SOURCE" --cov-report=term-missing --cov-fail-under="$COVERAGE_FAIL_UNDER" -q
+          else
+            uv run pytest --cov --cov-report=term-missing --cov-fail-under="$COVERAGE_FAIL_UNDER" -q
+          fi
+
+  build-verify:
+    name: Build Verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - run: uv run python -m build
+
+      - name: Verify wheel entry points
+        if: ${{ inputs.wheel-entry-points != '' }}
+        shell: bash
+        env:
+          ENTRY_POINTS: ${{ inputs.wheel-entry-points }}
+        run: |
+          python3 -c "
+          import configparser, glob, os, sys, zipfile
+          entry_points = os.environ['ENTRY_POINTS'].split()
+          if not entry_points:
+              print('ERROR: no entry point names provided')
+              sys.exit(1)
+          wheels = sorted(glob.glob('dist/*.whl'))
+          if not wheels:
+              print('ERROR: no .whl found in dist/')
+              sys.exit(1)
+          wheel = wheels[-1]
+          with zipfile.ZipFile(wheel) as z:
+              ep_path = next((n for n in z.namelist() if n.endswith('.dist-info/entry_points.txt')), None)
+              if not ep_path:
+                  print(f'ERROR: no entry_points.txt in {wheel}')
+                  sys.exit(1)
+              ep_content = z.read(ep_path).decode('utf-8')
+          cp = configparser.ConfigParser()
+          cp.read_string(ep_content)
+          found = {o for s in cp.sections() for o in cp.options(s)}
+          missing = [ep for ep in entry_points if ep not in found]
+          if missing:
+              print(f'ERROR: missing entry points in {wheel}: {missing}')
+              print(f'Found: {sorted(found)}')
+              sys.exit(1)
+          print(f'Verified {len(entry_points)} entry point(s) in {os.path.basename(wheel)}')
+          "
+
+  mcp-integration:
+    name: MCP Server Integration
+    if: ${{ inputs.run-mcp-integration }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - name: Run MCP integration tests
+        shell: bash
+        env:
+          MCP_ENV_VARS: ${{ inputs.mcp-env-vars }}
+          MCP_TEST_PATH: ${{ inputs.mcp-test-path }}
+        run: |
+          if [ -n "$MCP_ENV_VARS" ]; then
+            while IFS='=' read -r key value; do
+              key="${key#"${key%%[![:space:]]*}"}"
+              key="${key%"${key##*[![:space:]]}"}"
+              if [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                echo "ERROR: invalid env var name: $key" >&2
+                exit 1
+              fi
+              export "$key=$value"
+            done <<< "$MCP_ENV_VARS"
+          fi
+          [[ "$MCP_TEST_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid test path" >&2; exit 1; }
+          uv run pytest "$MCP_TEST_PATH"/ -v

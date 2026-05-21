@@ -1,0 +1,41 @@
+name: Publish Crate
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/publish-cargo.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      registry:
+        description: "Cargo registry name"
+        type: string
+        default: "crates-io"
+      toolchain:
+        description: "Rust toolchain version"
+        type: string
+        default: "1.87.0"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and Publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: brainxio/actions/setup-rust-deps@v1
+        with:
+          toolchain: ${{ inputs.toolchain }}
+          components: clippy, rustfmt
+
+      - name: Publish crate
+        # zizmor: ignore[use-trusted-publishing] — cargo publish requires registry token; trusted publishing not supported by crates.io
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY: ${{ inputs.registry }}
+        run: cargo publish --registry "$CARGO_REGISTRY"
