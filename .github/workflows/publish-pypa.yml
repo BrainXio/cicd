@@ -44,12 +44,8 @@ jobs:
       - name: Build package
         run: uv run python -m build
 
-      - name: Publish to registry
-        # Token contract:
-        #   - GitHub Packages (default URL)  → GITHUB_TOKEN is sufficient.
-        #   - pypi.org / test.pypi.org       → caller MUST provide PYPI_API_TOKEN secret.
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@4
         with:
-          repository-url: ${{ inputs.repository-url }}
-          password: ${{ secrets.PYPI_API_TOKEN || secrets.GITHUB_TOKEN }}
-          attestations: ${{ inputs.attestations }}
+          name: dist
+          path: dist/
