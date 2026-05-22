@@ -60,7 +60,32 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6
+      - name: Check for common ancestor
+        id: common-ancestor
+        shell: bash
+        run: |
+          # Skip commitlint if before SHA is all zeros (new branch/repo)
+          if [ "$GITHUB_EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "No common ancestor: before SHA is all zeros (force-pushed new root)"
+            exit 0
+          fi
+
+          # Check if before and after SHAs have a common ancestor
+          if git merge-base --is-ancestor "$GITHUB_EVENT_BEFORE" "$GITHUB_EVENT_AFTER" 2>/dev/null; then
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          else
+            # No common ancestor - skip commitlint check
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "No common ancestor between $GITHUB_EVENT_BEFORE and $GITHUB_EVENT_AFTER - skipping commitlint"
+          fi
+
+      - name: Commitlint
+        if: steps.common-ancestor.outputs.skipped != 'true'
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6
         with:
           failOnWarnings: true
           helpURL: ""
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          GITHUB_EVENT_AFTER: ${{ github.event.after }}
