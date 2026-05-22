@@ -9,7 +9,7 @@ on:
       auto-merge-major-actions:
         description: "Auto-merge major version bumps of GitHub Actions"
         type: boolean
-        default: true
+        default: false
 
 jobs:
   dependabot-auto-merge:
@@ -62,11 +62,21 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR_URL"
 
-      - name: Approve PR
-        if: steps.auto-mergeable.outputs.result == 'true'
-        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4.0.0
+      - name: Comment on major action bump
+        if: steps.auto-mergeable.outputs.result != 'true' && steps.metadata.outputs.update-type == 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem == 'github_actions'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Major version bump of GitHub Actions detected. Manual review required before merge.\n' +
+                    '- Dependency: ' + process.env.DEPENDENCY_NAMES + '\n' +
+                    '@brainxio/maintainers please review.'
+            })
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
 
       - name: Add visibility comment
         if: steps.auto-mergeable.outputs.result == 'true'
