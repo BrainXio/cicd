@@ -18,19 +18,19 @@ jobs:
 
 ## Available Workflows
 
-| Workflow | Purpose |
-|---|---|
-| `ci-python.yml` | Lint, typecheck, test, and coverage for Python |
-| `ci-go.yml` | Format check, build, vet, and test for Go |
-| `ci-rust.yml` | Format check, clippy, test for Rust |
-| `ci-typescript.yml` | Lint, typecheck, and test for TypeScript |
-| `publish-pypa.yml` | Build and publish Python packages |
-| `publish-npm.yml` | Publish npm packages |
-| `publish-cargo.yml` | Publish Rust crates |
-| `starter-checks.yml` | Secret scan, merge conflict, commit message validation |
-| `doc-quality.yml` | Markdown formatting, YAML lint, spell check |
-| `sync-defaults.yml` | Sync labels and defaults across repos |
-| `dependabot-auto-merge.yml` | Auto-merge low-risk Dependabot PRs |
+| Workflow                    | Purpose                                                |
+| --------------------------- | ------------------------------------------------------ |
+| `ci-python.yml`             | Lint, typecheck, test, and coverage for Python         |
+| `ci-go.yml`                 | Format check, build, vet, and test for Go              |
+| `ci-rust.yml`               | Format check, clippy, test for Rust                    |
+| `ci-typescript.yml`         | Lint, typecheck, and test for TypeScript               |
+| `publish-pypa.yml`          | Build and publish Python packages                      |
+| `publish-npm.yml`           | Publish npm packages                                   |
+| `publish-cargo.yml`         | Publish Rust crates                                    |
+| `starter-checks.yml`        | Secret scan, merge conflict, commit message validation |
+| `doc-quality.yml`           | Markdown formatting, YAML lint, spell check            |
+| `sync-defaults.yml`         | Sync labels and defaults across repos                  |
+| `dependabot-auto-merge.yml` | Auto-merge low-risk Dependabot PRs                     |
 
 ## Versioning
 
