@@ -89,3 +89,45 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
           GITHUB_EVENT_AFTER: ${{ github.event.after }}
+
+  diffstat-gate:
+    name: Scope Creep Diffstat Gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Diffstat gate
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'scope-creep-approved') }}
+        run: |
+          base_ref="${{ github.base_ref }}"
+          if [ -z "$base_ref" ]; then
+            echo "Not a PR event; skipping diffstat gate"
+            exit 0
+          fi
+
+          git fetch origin "$base_ref" --depth=1
+          stats=$(git diff --stat origin/"$base_ref"..HEAD | tail -1)
+
+          files_changed=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) file.*/\1/p')
+          [ -z "$files_changed" ] && files_changed=0
+
+          insertions=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) insertion.*/\1/p')
+          [ -z "$insertions" ] && insertions=0
+
+          deletions=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) deletion.*/\1/p')
+          [ -z "$deletions" ] && deletions=0
+
+          total_lines=$((insertions + deletions))
+
+          echo "Diffstat: $files_changed files changed, $total_lines lines changed ($insertions insertions, $deletions deletions)"
+
+          if [ "$files_changed" -gt 5 ] || [ "$total_lines" -gt 500 ]; then
+            echo "ERROR: Diffstat exceeds limits (max 5 files, 500 lines)."
+            echo "Add the 'scope-creep-approved' label to override."
+            exit 1
+          fi
+
+          echo "Diffstat within limits."
