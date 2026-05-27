@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# BrainXio pre-commit hook — universal checks + standards guard + language detection
+set -euo pipefail
+
+echo "Running BrainXio pre-commit checks..."
+
+# Escape hatch: set SKIP_STANDARDS_GUARD=1 to bypass (use sparingly)
+if [ -n "${SKIP_STANDARDS_GUARD:-}" ]; then
+  echo "SKIP_STANDARDS_GUARD set — skipping standards checks."
+  exit 0
+fi
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+if [ -z "$staged_files" ]; then
+  exit 0
+fi
+
+# ====================== STANDARDS GUARD (BrainXio-specific) ======================
+
+FORBIDDEN_PATTERNS=(
+  "local-first"
+  "local first"
+  "quiet joy"
+  "[Cc]ore approval"
+  "[Ss]acred"
+  "[Aa]nother [Ii]ntelligence"
+  "sovereign AI"
+  "sovereign agent"
+  "fun\*\*ctional"
+  "becoming a proper idiot"
+  "restless mirror of curiosity"
+  "is the only allowed"
+  "is the \*\*only\*\* allowed"
+  "managed exclusively through"
+  "AI will replace"
+  "existential risk"
+  "existential threat"
+  "intelligence explosion"
+  "paperclip maximizer"
+  "paperclip"
+  "kill switch"
+  "AI uprising"
+  "robot takeover"
+  "unfriendly AI"
+  "control problem"
+  "x-risk"
+  "doomer"
+  "sentient AI"
+  "conscious AI"
+  "AI rights"
+  "technological singularity"
+  "[Cc]o-authored[- ]by"
+  "[Gg]enerated[- ]by[- ]AI"
+  "[Aa]I[- ]generated"
+  "[Ww]ritten[- ]by[- ](Claude|ChatGPT|Copilot|Gemini)"
+  "GitHub[- ]Copilot"
+  "[Cc]reated[- ]with[- ](Claude|ChatGPT|Copilot|Gemini)"
+)
+
+ALLOWED_REPOS=(
+  "brainxio/.github"
+  "brainxio/tools"
+  "brainxio/claude-agent-workflows"
+)
+
+violations=0
+
+for file in $staged_files; do
+  case "$file" in
+    *.md|*.py|*.yml|*.yaml|*.json|*.toml|*.txt|*.sh|*.js|*.ts|*.html|*.css)
+      ;;
+    *)
+      continue
+      ;;
+  esac
+
+  content=$(git show ":$file" 2>/dev/null || true)
+  if [ -z "$content" ]; then
+    continue
+  fi
+
+  for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+    matches=$(echo "$content" | grep -inE "$pattern" 2>/dev/null || true)
+    if [ -n "$matches" ]; then
+      echo "ERROR: forbidden pattern '$pattern' in $file:" >&2
+      echo "$matches" | head -5 >&2
+      violations=$((violations + 1))
+    fi
+  done
+
+  phantom_links=$(echo "$content" | grep -oE '\[.*?\]\(https://github\.com/[^)]+\)' 2>/dev/null || true)
+  if [ -n "$phantom_links" ]; then
+    while IFS= read -r link; do
+      repo=$(echo "$link" | grep -oE '(brainxio|BrainXio)/[^)]+' || true)
+      if [ -n "$repo" ]; then
+        allowed=false
+        lc_repo=$(echo "$repo" | tr '[:upper:]' '[:lower:]')
+        for ok in "${ALLOWED_REPOS[@]}"; do
+          lc_ok=$(echo "$ok" | tr '[:upper:]' '[:lower:]')
+          if [ "$lc_repo" = "$lc_ok" ]; then
+            allowed=true
+            break
+          fi
+        done
+        if [ "$allowed" = "false" ]; then
+          echo "ERROR: unverified repo link in $file: $repo" >&2
+          violations=$((violations + 1))
+        fi
+      fi
+    done <<< "$phantom_links"
+  fi
+
+  emails=$(echo "$content" | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' 2>/dev/null || true)
+  if [ -n "$emails" ]; then
+    while IFS= read -r email; do
+      domain="${email##*@}"
+      if [ "$domain" != "brainxio.org" ]; then
+        echo "ERROR: disallowed email address in $file: $email (only @brainxio.org permitted)" >&2
+        violations=$((violations + 1))
+      fi
+    done <<< "$emails"
+  fi
+done
+
+if [ "$violations" -gt 0 ]; then
+  echo "" >&2
+  echo "Standards guard: $violations violation(s) found." >&2
+  exit 1
+fi
+
+# ====================== UNIVERSAL CHECKS ======================
+
+# Markdown formatting
+if echo "$staged_files" | grep -qE '\.md$'; then
+  echo "Checking markdown formatting..."
+  echo "$staged_files" | grep -E '\.md$' | xargs -r \
+    uvx --with mdformat-frontmatter --with mdformat-gfm mdformat --check || {
+    echo "Fix with: uvx --with mdformat-frontmatter --with mdformat-gfm mdformat ."
+    exit 1
+  }
+fi
+
+# YAML linting
+if echo "$staged_files" | grep -qE '\.ya?ml$'; then
+  echo "Linting YAML files..."
+  echo "$staged_files" | grep -E '\.ya?ml$' | xargs -r \
+    uvx --from yamllint yamllint -c .yamllint 2>/dev/null || \
+    uvx --from yamllint yamllint || exit 1
+fi
+
+# JSON validation
+if echo "$staged_files" | grep -qE '\.json$'; then
+  echo "Validating JSON files..."
+  for file in $(echo "$staged_files" | grep -E '\.json$'); do
+    if ! uvx --from jq jq empty "$file" >/dev/null 2>&1; then
+      echo "Invalid JSON in $file"
+      exit 1
+    fi
+  done
+fi
+
+# Attribution guard (all staged docs/scripts, bypassed by frontmatter marker)
+ATTRIBUTION_PATTERNS=(
+  "[Cc]o-authored[- ]by"
+  "[Gg]enerated[- ]by[- ]AI"
+  "[Aa]I[- ]generated"
+  "[Ww]ritten[- ]by[- ](Claude|ChatGPT|Copilot|Gemini)"
+  "[Cc]reated[- ]with[- ](Claude|ChatGPT|Copilot|Gemini)"
+  "GitHub[- ]Copilot"
+)
+
+attr_violations=0
+docs_to_check=$(echo "$staged_files" | grep -E '\.(md|yaml|yml|json|py|sh)$' || true)
+
+for file in $docs_to_check; do
+  content=$(git show ":$file" 2>/dev/null || true)
+  if [ -z "$content" ]; then
+    continue
+  fi
+  if echo "$content" | head -5 | grep -q "pre-commit: bypass-attribution"; then
+    continue
+  fi
+  for pattern in "${ATTRIBUTION_PATTERNS[@]}"; do
+    matches=$(echo "$content" | grep -inE "$pattern" 2>/dev/null || true)
+    if [ -n "$matches" ]; then
+      echo "ERROR: forbidden attribution pattern in $file:" >&2
+      echo "$matches" | head -5 >&2
+      attr_violations=$((attr_violations + 1))
+    fi
+  done
+done
+
+if [ "$attr_violations" -gt 0 ]; then
+  echo "Attribution guard failed: $attr_violations violation(s). Remove AI-generated attribution." >&2
+  exit 1
+fi
+
+# Standards guard (delegated to claude-standards-guard for broader checks)
+if echo "$staged_files" | grep -qE '\.(md|ya?ml)$'; then
+  echo "Running claude-standards-guard..."
+  standards_violations=0
+
+  for file in $(echo "$staged_files" | grep -E '\.(md|ya?ml)$'); do
+    content=$(git show ":$file" 2>/dev/null || true)
+    if [ -z "$content" ]; then
+      continue
+    fi
+
+    guard_path="$file"
+    if [ "$(basename "$file")" = "README.md" ]; then
+      guard_path="repo/$file"
+    fi
+
+    payload=$(jq -n --arg fp "$guard_path" --arg ct "$content" '{"tool_name":"Write","tool_input":{"file_path":$fp,"content":$ct}}')
+    if ! result=$(echo "$payload" | uvx --from git+https://github.com/BrainXio/claude-cli.git claude-standards-guard 2>/dev/null); then
+      echo "WARNING: could not run claude-standards-guard for $file (skipping)" >&2
+      continue
+    fi
+
+    if echo "$result" | grep -q '"permissionDecision": "deny"'; then
+      reason=$(echo "$result" | jq -r '.hookSpecificOutput.permissionDecisionReason // "Standards guard violation"' 2>/dev/null || echo "Standards guard violation")
+      echo "ERROR: $file: $reason" >&2
+      standards_violations=$((standards_violations + 1))
+    fi
+  done
+
+  if [ "$standards_violations" -gt 0 ]; then
+    echo "" >&2
+    echo "Standards guard failed: $standards_violations violation(s)." >&2
+    exit 1
+  fi
+fi
+
+# ====================== LANGUAGE-SPECIFIC CHECKS ======================
+
+echo "Running language-specific checks..."
+
+# Python
+if [ -f "pyproject.toml" ] || echo "$staged_files" | grep -qE '\.py$'; then
+  echo "Python project detected"
+  if command -v uv >/dev/null; then
+    uv run ruff check --select I --fix --unsafe-fixes . 2>/dev/null || true
+    uv run ruff format --check . || exit 1
+  else
+    uvx --from ruff ruff check --select I --fix --unsafe-fixes . 2>/dev/null || true
+    uvx --from ruff ruff format --check . || exit 1
+  fi
+fi
+
+# Rust
+if [ -f "Cargo.toml" ] || echo "$staged_files" | grep -qE '\.rs$'; then
+  echo "Rust project detected"
+  cargo fmt --check 2>/dev/null || exit 1
+  cargo clippy -- -D warnings 2>/dev/null || exit 1
+fi
+
+# Go
+if [ -f "go.mod" ] || echo "$staged_files" | grep -qE '\.go$'; then
+  echo "Go project detected"
+  go fmt ./... || exit 1
+  go vet ./... || exit 1
+fi
+
+# JavaScript / TypeScript
+if [ -f "package.json" ] || echo "$staged_files" | grep -qE '\.(js|ts|jsx|tsx)$'; then
+  echo "JavaScript/TypeScript project detected"
+  if [ -f "package.json" ]; then
+    npx eslint . --fix --max-warnings=0 2>/dev/null || exit 1
+    npx prettier --check . 2>/dev/null || exit 1
+  fi
+fi
+
+# Shell scripts
+if echo "$staged_files" | grep -qE '\.sh$'; then
+  echo "Shell scripts detected"
+  echo "$staged_files" | grep -E '\.sh$' | xargs -r \
+    uvx --from shellcheck shellcheck || exit 1
+fi
+
+echo "Pre-commit checks passed."
+exit 0
