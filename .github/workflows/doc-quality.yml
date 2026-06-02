@@ -82,7 +82,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: lycheeverse/lychee-action@373c709c69115d41ff229c7e5df9f8788daa9553 # v2
+      - uses: lycheeverse/lychee-action@f613c4a64e50d792e0b31ec34bbcbba12263c6a6 # v2.3.0
         with:
           args: --base ${{ inputs.link-check-base }} ${{ inputs.link-check-paths }}
           fail: ${{ inputs.link-check-fail }}

@@ -55,9 +55,29 @@ permissions:
   contents: read
 
 jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: brainxio/actions/common-setup@v1
+        with:
+          language: python
+          version: ${{ inputs.python-version }}
+
+      - name: Sync dependencies
+        if: ${{ inputs.extra-deps != '' }}
+        shell: bash
+        run: uv sync --extra ${{ inputs.extra-deps }}
+
+      - name: Sync base dependencies
+        if: ${{ inputs.extra-deps == '' }}
+        shell: bash
+        run: uv sync
+
   lint:
     name: Lint and Format
     runs-on: ubuntu-24.04
+    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
@@ -91,6 +111,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-24.04
+    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
@@ -123,6 +144,7 @@ jobs:
   test:
     name: Test and Coverage
     runs-on: ubuntu-24.04
+    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
@@ -144,6 +166,7 @@ jobs:
   build-verify:
     name: Build Verify
     runs-on: ubuntu-24.04
+    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
@@ -190,6 +213,7 @@ jobs:
     name: MCP Server Integration
     if: ${{ inputs.run-mcp-integration }}
     runs-on: ubuntu-24.04
+    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
