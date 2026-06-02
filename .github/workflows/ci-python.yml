@@ -55,8 +55,8 @@ permissions:
   contents: read
 
 jobs:
-  setup:
-    name: Setup
+  lint:
+    name: Lint and Format
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -73,16 +73,6 @@ jobs:
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
         run: uv sync
-
-  lint:
-    name: Lint and Format
-    runs-on: ubuntu-24.04
-    needs: setup
-    steps:
-      - uses: brainxio/actions/common-setup@v1
-        with:
-          language: python
-          version: ${{ inputs.python-version }}
 
       - name: Run gitleaks detect
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
@@ -111,12 +101,21 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-24.04
-    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
           language: python
           version: ${{ inputs.python-version }}
+
+      - name: Sync dependencies
+        if: ${{ inputs.extra-deps != '' }}
+        shell: bash
+        run: uv sync --extra ${{ inputs.extra-deps }}
+
+      - name: Sync base dependencies
+        if: ${{ inputs.extra-deps == '' }}
+        shell: bash
+        run: uv sync
 
       - name: Determine mypy target
         id: mypy-target
@@ -144,12 +143,21 @@ jobs:
   test:
     name: Test and Coverage
     runs-on: ubuntu-24.04
-    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
           language: python
           version: ${{ inputs.python-version }}
+
+      - name: Sync dependencies
+        if: ${{ inputs.extra-deps != '' }}
+        shell: bash
+        run: uv sync --extra ${{ inputs.extra-deps }}
+
+      - name: Sync base dependencies
+        if: ${{ inputs.extra-deps == '' }}
+        shell: bash
+        run: uv sync
 
       - name: Run tests with coverage
         shell: bash
@@ -166,12 +174,21 @@ jobs:
   build-verify:
     name: Build Verify
     runs-on: ubuntu-24.04
-    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
           language: python
           version: ${{ inputs.python-version }}
+
+      - name: Sync dependencies
+        if: ${{ inputs.extra-deps != '' }}
+        shell: bash
+        run: uv sync --extra ${{ inputs.extra-deps }}
+
+      - name: Sync base dependencies
+        if: ${{ inputs.extra-deps == '' }}
+        shell: bash
+        run: uv sync
 
       - run: uv run python -m build
 
@@ -213,12 +230,21 @@ jobs:
     name: MCP Server Integration
     if: ${{ inputs.run-mcp-integration }}
     runs-on: ubuntu-24.04
-    needs: setup
     steps:
       - uses: brainxio/actions/common-setup@v1
         with:
           language: python
           version: ${{ inputs.python-version }}
+
+      - name: Sync dependencies
+        if: ${{ inputs.extra-deps != '' }}
+        shell: bash
+        run: uv sync --extra ${{ inputs.extra-deps }}
+
+      - name: Sync base dependencies
+        if: ${{ inputs.extra-deps == '' }}
+        shell: bash
+        run: uv sync
 
       - name: Run MCP integration tests
         shell: bash
