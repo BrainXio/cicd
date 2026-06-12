@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BrainXio commit-msg hook — blocks AI attribution in commit messages
+# Validate conventional commit format and reject AI attribution patterns
 set -euo pipefail
 
 msg_file="$1"
@@ -7,8 +7,24 @@ if [ ! -f "$msg_file" ]; then
   exit 0
 fi
 
+# Read commit message, strip comments
 content=$(grep -v '^#' "$msg_file" || true)
 
+# Check for conventional commit format: type(scope): description or type: description
+# Types: feat, fix, docs, style, refactor, test, chore, ci, build, perf
+if ! echo "$content" | head -1 | grep -qE '^(feat|fix|docs|style|refactor|test|chore|ci|build|perf)(\([a-zA-Z0-9_-]+\))?: .+$'; then
+  echo "ERROR: Commit message does not follow Conventional Commits format." >&2
+  echo "Expected: <type>(<scope>): <description>" >&2
+  echo "Types: feat, fix, docs, style, refactor, test, chore, ci, build, perf" >&2
+  echo "" >&2
+  echo "Examples:" >&2
+  echo "  feat: add user authentication" >&2
+  echo "  fix(auth): resolve token expiry bug" >&2
+  echo "  chore(deps): bump actions/checkout from 4 to 5" >&2
+  exit 1
+fi
+
+# Reject AI attribution patterns
 ATTRIBUTION_PATTERNS=(
   "[Cc]o-authored[- ]by"
   "[Gg]enerated[- ]by[- ]AI"
@@ -29,7 +45,7 @@ for pattern in "${ATTRIBUTION_PATTERNS[@]}"; do
 done
 
 if [ "$violations" -gt 0 ]; then
-  echo "Commit message attribution guard failed: $violations violation(s). Remove AI attribution." >&2
+  echo "Commit message guard failed: $violations violation(s). Remove AI attribution." >&2
   exit 1
 fi
 
