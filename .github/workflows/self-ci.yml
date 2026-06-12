@@ -272,7 +272,7 @@ jobs:
           go 1.24
           EOF
 
-          cat > "$TEST_DIR/main.go" << 'EOF'
+          cat > "$TEST_DIR/main.go" << 'GOEOF'
           package main
 
           import "fmt"
@@ -284,9 +284,9 @@ jobs:
           func hello() string {
           	return "hello"
           }
-          EOF
+          GOEOF
 
-          cat > "$TEST_DIR/main_test.go" << 'EOF'
+          cat > "$TEST_DIR/main_test.go" << 'GOEOF'
           package main
 
           import "testing"
@@ -296,7 +296,7 @@ jobs:
           		t.Error("expected hello")
           	}
           }
-          EOF
+          GOEOF
 
           echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
