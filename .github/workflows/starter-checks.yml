@@ -19,12 +19,12 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: trufflesecurity/trufflehog@0ec3634f6cf66a61912a923fee9d20cc45633a67 # v3.88.0
+      - uses: trufflesecurity/trufflehog@v3
         with:
           extra_args: --only-verified
 
@@ -32,13 +32,14 @@ jobs:
     name: Merge Conflict Check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Scan for unresolved merge conflict markers
         shell: bash
         run: |
+          set -euo pipefail
           conflicts=$(git grep -lE '^(<<<<<<< |>>>>>>> |=======$)' \\
             -- '*.py' '*.ts' '*.tsx' '*.rs' '*.go' '*.yml' '*.yaml' \\
             '*.md' '*.toml' '*.json' '*.sh' '*.bash' '*.css' '*.html' \\
@@ -55,7 +56,7 @@ jobs:
     if: ${{ inputs.check-commit-messages }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -64,10 +65,11 @@ jobs:
         id: common-ancestor
         shell: bash
         run: |
+          set -euo pipefail
           # Skip commitlint if before SHA is all zeros (new branch/repo)
-          if [ "$GITHUB_EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+          if [ -z "$GITHUB_EVENT_BEFORE" ] || [ "$GITHUB_EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
             echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "No common ancestor: before SHA is all zeros (force-pushed new root)"
+            echo "No common ancestor: before SHA is all zeros or empty (force-pushed new root)"
             exit 0
           fi
 
@@ -82,7 +84,7 @@ jobs:
 
       - name: Commitlint
         if: steps.common-ancestor.outputs.skipped != 'true'
-        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6
+        uses: wagoid/commitlint-github-action@v6
         with:
           failOnWarnings: true
           helpURL: ""
@@ -94,14 +96,16 @@ jobs:
     name: Scope Creep Diffstat Gate
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Diffstat gate
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'scope-creep-approved') }}
+        shell: bash
         run: |
+          set -euo pipefail
           base_ref="${{ github.base_ref }}"
           if [ -z "$base_ref" ]; then
             echo "Not a PR event; skipping diffstat gate"
@@ -109,16 +113,10 @@ jobs:
           fi
 
           git fetch origin "$base_ref" --depth=1
-          stats=$(git diff --stat origin/"$base_ref"..HEAD | tail -1)
 
-          files_changed=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) file.*/\1/p')
-          [ -z "$files_changed" ] && files_changed=0
-
-          insertions=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) insertion.*/\1/p')
-          [ -z "$insertions" ] && insertions=0
-
-          deletions=$(echo "$stats" | sed -n 's/.* \([0-9]\+\) deletion.*/\1/p')
-          [ -z "$deletions" ] && deletions=0
+          files_changed=$(git diff --stat origin/"$base_ref"..HEAD --name-only | wc -l)
+          insertions=$(git diff --shortstat origin/"$base_ref"..HEAD | grep -oP '\d+(?= insertion)' || echo 0)
+          deletions=$(git diff --shortstat origin/"$base_ref"..HEAD | grep -oP '\d+(?= deletion)' || echo 0)
 
           total_lines=$((insertions + deletions))
 

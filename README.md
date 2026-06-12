@@ -30,7 +30,6 @@ jobs:
 | `starter-checks.yml`        | Secret scan, merge conflict, commit message validation |
 | `doc-quality.yml`           | Markdown formatting, YAML lint, spell check            |
 | `sync-defaults.yml`         | Sync labels and defaults across repos                  |
-| `dependabot-auto-merge.yml` | Auto-merge low-risk Dependabot PRs                     |
 
 ## Versioning
 

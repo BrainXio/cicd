@@ -39,36 +39,40 @@ jobs:
     name: Lint and Format Check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - name: Install doc tools
-        run: |
-          python3 -m pip install --quiet mdformat mdformat-frontmatter mdformat-gfm yamllint
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Run mdformat check
         shell: bash
         env:
           MD_PATHS: ${{ inputs.md-paths }}
-        run: mdformat --check $MD_PATHS
+        run: |
+          set -euo pipefail
+          uv run --with mdformat --with mdformat-frontmatter --with mdformat-gfm mdformat --check $MD_PATHS
 
       - name: Run yamllint
         shell: bash
         env:
           YAML_PATHS: ${{ inputs.yaml-paths }}
-        run: yamllint $YAML_PATHS
+        run: |
+          set -euo pipefail
+          uv run --with yamllint yamllint $YAML_PATHS
 
   typos:
     name: Spell Check
     if: ${{ inputs.typos-config != '' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: crate-ci/typos@6ac2ebd1b93eade61faf7e12688ad87a073fea59 # v1.46.0
+      - uses: crate-ci/typos@v1
         with:
           config: ${{ inputs.typos-config }}
 
@@ -78,11 +82,11 @@ jobs:
     runs-on: ubuntu-24.04
     continue-on-error: ${{ !inputs.link-check-fail }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: lycheeverse/lychee-action@f613c4a64e50d792e0b31ec34bbcbba12263c6a6 # v2.3.0
+      - uses: lycheeverse/lychee-action@v2
         with:
           args: --base ${{ inputs.link-check-base }} ${{ inputs.link-check-paths }}
           fail: ${{ inputs.link-check-fail }}

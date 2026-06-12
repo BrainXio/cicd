@@ -28,13 +28,13 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: read  # Push auth via secrets.SYNC_TOKEN, not GITHUB_TOKEN
 
 jobs:
   sync:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -49,13 +49,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Validate inputs with regex to prevent injection
+          # Validate target-repo format
           if ! [[ "$TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "ERROR: target-repo must match ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
-            exit 1
-          fi
-          if ! [[ "$DEFAULTS_PATH" =~ ^[A-Za-z0-9_./-]+$ ]]; then
-            echo "ERROR: defaults-path contains invalid characters"
             exit 1
           fi
 
@@ -64,6 +60,7 @@ jobs:
             exit 1
           fi
 
+          DEFAULTS_ABS_PATH=$(realpath "$DEFAULTS_PATH")
           DEFAULTS_PATH="${DEFAULTS_PATH%/}"
           REPO_SLUG="${TARGET_REPO%%/*}"
           REPO_NAME="${TARGET_REPO#*/}"
@@ -84,7 +81,7 @@ jobs:
 
           # Detect drift
           DRIFT=0
-          for src_file in "$DEFAULTS_PATH"/*; do
+          for src_file in "$DEFAULTS_ABS_PATH"/*; do
             [[ -f "$src_file" ]] || continue
             filename=$(basename "$src_file")
             if [[ -f "$filename" ]]; then
@@ -98,6 +95,16 @@ jobs:
             else
               DRIFT=1
               echo "DRIFT: $filename is new"
+            fi
+          done
+
+          # Reverse check: files in target not in source
+          for target_file in ./*; do
+            [[ -f "$target_file" ]] || continue
+            filename=$(basename "$target_file")
+            if [[ ! -f "$DEFAULTS_ABS_PATH/$filename" ]]; then
+              DRIFT=1
+              echo "DRIFT: $filename exists in target but not in source"
             fi
           done
 

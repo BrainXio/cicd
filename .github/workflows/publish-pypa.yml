@@ -6,17 +6,16 @@ name: Publish Python Package
 on:
   workflow_call:
     inputs:
-      attestations:
-        description: "Enable PEP 740 attestations"
-        type: string
-        default: "false"
       repository-url:
-        description: "Package registry URL. Default GitHub Packages (uses GITHUB_TOKEN). For pypi.org use https://upload.pypi.org/legacy/ and provide PYPI_API_TOKEN secret."
+        description: "Package registry URL. Default GitHub Packages (uses GITHUB_TOKEN). For pypi.org use https://upload.pypi.org/legacy/ and provide PYPI_TOKEN. For test.pypi.org use https://test.pypi.org/legacy/ and provide TEST_PYPI_TOKEN."
         type: string
         default: "https://pypi.pkg.github.com/${{ github.repository_owner }}"
     secrets:
-      PYPI_API_TOKEN:
-        description: "PyPI API token. Required for pypi.org or test.pypi.org. Omit for GitHub Packages."
+      PYPI_TOKEN:
+        description: "PyPI API token. Required for pypi.org publishing."
+        required: false
+      TESTPYPI_TOKEN:
+        description: "TestPyPI API token. Required for test.pypi.org publishing."
         required: false
 
 jobs:
@@ -24,34 +23,39 @@ jobs:
     name: Build and Publish
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: write  # Required for GitHub Release creation
       packages: write
       id-token: write
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
       - name: Install dependencies
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
       - name: Build package
-        run: uv run python -m build
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python -m build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true

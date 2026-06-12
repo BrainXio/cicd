@@ -14,18 +14,19 @@ jobs:
     name: Validate Workflow Syntax
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - name: Install PyYAML
-        shell: bash
-        run: pip install pyyaml 2>/dev/null || python3 -m pip install pyyaml
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: YAML syntax check
         shell: bash
         run: |
-          python3 -c "
+          set -euo pipefail
+          uv run --with pyyaml python -c "
           import sys, yaml, glob
           errors = []
           for f in sorted(glob.glob('.github/workflows/*.yml')):
@@ -42,28 +43,34 @@ jobs:
           "
 
       - name: Enforce no deprecated actions/cache@v[0-3]
+        shell: bash
         run: |
+          set -euo pipefail
           ! grep -rE 'actions/cache@v[0-3]' . || \
           (echo "FAIL: Deprecated actions/cache@v[0-3] detected — must use @v4" && exit 1)
 
   test-ci-python-synthetic:
     name: Synthetic Python CI Test
+    needs: validate-workflows
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Create synthetic Python project
         shell: bash
         run: |
-          mkdir -p /tmp/test-project/src/test_pkg
-          mkdir -p /tmp/test-project/tests
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+          mkdir -p "$TEST_DIR/src/test_pkg"
+          mkdir -p "$TEST_DIR/tests"
 
-          cat > /tmp/test-project/pyproject.toml << 'PYEOF'
+          cat > "$TEST_DIR/pyproject.toml" << 'PYEOF'
           [build-system]
           requires = ["hatchling"]
           build-backend = "hatchling.build"
@@ -78,66 +85,80 @@ jobs:
           packages = ["src/test_pkg"]
           PYEOF
 
-          cat > /tmp/test-project/src/test_pkg/__init__.py << 'PYEOF'
+          cat > "$TEST_DIR/src/test_pkg/__init__.py" << 'PYEOF'
           """Test package."""
           __version__ = "0.1.0"
           PYEOF
 
-          cat > /tmp/test-project/src/test_pkg/main.py << 'PYEOF'
+          cat > "$TEST_DIR/src/test_pkg/main.py" << 'PYEOF'
           def greet(name: str) -> str:
               return f"Hello, {name}"
           PYEOF
 
-          cat > /tmp/test-project/tests/test_main.py << 'PYEOF'
+          cat > "$TEST_DIR/tests/test_main.py" << 'PYEOF'
           from test_pkg.main import greet
 
           def test_greet():
               assert greet("world") == "Hello, world"
           PYEOF
 
-      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.10"
           enable-cache: true
 
       - name: Run lint on synthetic project
-        working-directory: /tmp/test-project
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
         run: |
+          set -euo pipefail
           uv sync
           uv run ruff format src/ tests/
           uv run ruff check src/ tests/
           uv run ruff format --check src/ tests/
 
       - name: Run type check on synthetic project
-        working-directory: /tmp/test-project
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: uv run mypy src/test_pkg --strict
+        run: |
+          set -euo pipefail
+          uv run mypy src/test_pkg --strict
 
       - name: Run tests on synthetic project
-        working-directory: /tmp/test-project
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: uv run pytest --cov --cov-report=term-missing -q
+        run: |
+          set -euo pipefail
+          uv run pytest --cov --cov-report=term-missing -q
 
       - name: Build wheel
-        working-directory: /tmp/test-project
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: uv run python -m build
+        run: |
+          set -euo pipefail
+          uv run python -m build
 
   test-ci-typescript-synthetic:
     name: Synthetic TypeScript CI Test
+    needs: validate-workflows
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Create synthetic TypeScript project
+        shell: bash
         run: |
-          mkdir -p /tmp/test-project-ts/src
-          mkdir -p /tmp/test-project-ts/tests
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+          mkdir -p "$TEST_DIR/src"
+          mkdir -p "$TEST_DIR/tests"
 
-          cat > /tmp/test-project-ts/package.json << 'EOF'
+          cat > "$TEST_DIR/package.json" << 'EOF'
           {
             "name": "test-project-typescript",
             "version": "0.1.0",
@@ -157,7 +178,7 @@ jobs:
           }
           EOF
 
-          cat > /tmp/test-project-ts/tsconfig.json << 'EOF'
+          cat > "$TEST_DIR/tsconfig.json" << 'EOF'
           {
             "compilerOptions": {
               "target": "ES2020",
@@ -171,11 +192,11 @@ jobs:
           }
           EOF
 
-          cat > /tmp/test-project-ts/src/index.ts << 'EOF'
+          cat > "$TEST_DIR/src/index.ts" << 'EOF'
           export const hello = (name: string): string => "Hello, " + name;
           EOF
 
-          cat > /tmp/test-project-ts/tests/test.ts << 'EOF'
+          cat > "$TEST_DIR/tests/test.ts" << 'EOF'
           import { hello } from "../src/index";
 
           describe("hello", () => {
@@ -188,55 +209,70 @@ jobs:
           });
           EOF
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install dependencies
-        working-directory: /tmp/test-project-ts
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: npm install
+        run: |
+          set -euo pipefail
+          npm install
 
       - name: Run lint
-        working-directory: /tmp/test-project-ts
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: npm run lint
+        run: |
+          set -euo pipefail
+          npm run lint
 
       - name: Run format check
-        working-directory: /tmp/test-project-ts
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: npm run format:check
+        run: |
+          set -euo pipefail
+          npm run format:check
 
       - name: Run typecheck
-        working-directory: /tmp/test-project-ts
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: npm run typecheck
+        run: |
+          set -euo pipefail
+          npm run typecheck
 
       - name: Run tests
-        working-directory: /tmp/test-project-ts
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: npm test
+        run: |
+          set -euo pipefail
+          npm test
 
   test-ci-go-synthetic:
     name: Synthetic Go CI Test
+    needs: validate-workflows
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Create synthetic Go project
         shell: bash
         run: |
-          mkdir -p /tmp/test-project-go
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
 
-          cat > /tmp/test-project-go/go.mod << 'EOF'
+          cat > "$TEST_DIR/go.mod" << 'EOF'
           module test-project
 
-          go 1.22
+          go 1.24
           EOF
 
-          cat > /tmp/test-project-go/main.go << 'EOF'
+          cat > "$TEST_DIR/main.go" << 'EOF'
           package main
 
           import "fmt"
@@ -250,7 +286,7 @@ jobs:
           }
           EOF
 
-          cat > /tmp/test-project-go/main_test.go << 'EOF'
+          cat > "$TEST_DIR/main_test.go" << 'EOF'
           package main
 
           import "testing"
@@ -262,14 +298,17 @@ jobs:
           }
           EOF
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
+          go-version: "1.24"
 
       - name: Run gofmt check
-        working-directory: /tmp/test-project-go
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
         run: |
+          set -euo pipefail
           output=$(gofmt -d .)
           if [ -n "$output" ]; then
             echo "ERROR: gofmt found unformatted files:"
@@ -279,69 +318,351 @@ jobs:
           echo "gofmt: no issues"
 
       - name: Run go vet
-        working-directory: /tmp/test-project-go
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: go vet ./...
+        run: |
+          set -euo pipefail
+          go vet ./...
 
       - name: Run tests with race detector
-        working-directory: /tmp/test-project-go
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: go test -race -coverprofile=coverage.out ./...
+        run: |
+          set -euo pipefail
+          go test -race -coverprofile=coverage.out ./...
 
       - name: Run go build
-        working-directory: /tmp/test-project-go
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: go build ./...
+        run: |
+          set -euo pipefail
+          go build ./...
 
   test-ci-rust-synthetic:
     name: Synthetic Rust CI Test
+    needs: validate-workflows
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Create synthetic Rust project
         shell: bash
         run: |
-          mkdir -p /tmp/test-project-rust/src
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+          mkdir -p "$TEST_DIR/src"
 
-          cat > /tmp/test-project-rust/Cargo.toml << 'EOF'
+          cat > "$TEST_DIR/Cargo.toml" << 'EOF'
           [package]
           name = "test-project-rust"
           version = "0.1.0"
           edition = "2021"
           EOF
 
-          cat > /tmp/test-project-rust/src/lib.rs << 'EOF'
+          cat > "$TEST_DIR/src/lib.rs" << 'EOF'
           pub fn add(a: i32, b: i32) -> i32 {
               a + b
           }
           EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy,rustfmt
 
       - name: Run cargo fmt check
-        working-directory: /tmp/test-project-rust
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: cargo fmt --all -- --check
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
 
       - name: Run cargo clippy
-        working-directory: /tmp/test-project-rust
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: cargo clippy --all-targets -- -D warnings
+        run: |
+          set -euo pipefail
+          cargo clippy --all-targets -- -D warnings
 
       - name: Run cargo test
-        working-directory: /tmp/test-project-rust
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: cargo test
+        run: |
+          set -euo pipefail
+          cargo test
 
       - name: Run cargo build release
-        working-directory: /tmp/test-project-rust
+        working-directory: ${{ env.TEST_DIR }}
         shell: bash
-        run: cargo build --release
+        run: |
+          set -euo pipefail
+          cargo build --release
+
+  test-doc-quality-synthetic:
+    name: Synthetic Doc Quality Test
+    needs: validate-workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Create synthetic docs with issues
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+
+          cat > "$TEST_DIR/bad.md" << 'EOF'
+          # Title
+
+          - item 1
+          - item 2
+          no blank line before this paragraph
+          EOF
+
+          cat > "$TEST_DIR/bad.yml" << 'EOF'
+          key: value
+          key: duplicate
+          EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - name: Run mdformat check (should fail)
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if uv run --with mdformat --with mdformat-frontmatter --with mdformat-gfm mdformat --check bad.md 2>/dev/null; then
+            echo "FAIL: mdformat should have detected formatting issues"
+            exit 1
+          fi
+          echo "OK: mdformat caught formatting issue"
+
+      - name: Run yamllint (should fail)
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if uv run --with yamllint yamllint bad.yml 2>/dev/null; then
+            echo "FAIL: yamllint should have detected issues"
+            exit 1
+          fi
+          echo "OK: yamllint caught YAML issue"
+
+  test-starter-checks-synthetic:
+    name: Synthetic Starter Checks Test
+    needs: validate-workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Create file with merge conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+
+          cat > "$TEST_DIR/conflict.py" << 'EOF'
+          def foo():
+          <<<<<<< HEAD
+              return "a"
+          =======
+              return "b"
+          >>>>>>> branch
+          EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify conflict detection catches markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          conflicts=$(grep -rEl '^(<<<<<<< |>>>>>>> |=======$)' "$TEST_DIR" 2>/dev/null || true)
+          if [ -n "$conflicts" ]; then
+            echo "OK: Found conflict markers in test data"
+          else
+            echo "FAIL: Did not detect conflict markers"
+            exit 1
+          fi
+
+  test-publish-pypa-synthetic:
+    name: Synthetic PyPA Publish Test
+    needs: validate-workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Create minimal Python package
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+          mkdir -p "$TEST_DIR/src/test_pkg"
+
+          cat > "$TEST_DIR/pyproject.toml" << 'EOF'
+          [build-system]
+          requires = ["hatchling"]
+          build-backend = "hatchling.build"
+
+          [project]
+          name = "test-pkg"
+          version = "0.1.0"
+          requires-python = ">=3.10"
+          EOF
+
+          cat > "$TEST_DIR/src/test_pkg/__init__.py" << 'EOF'
+          __version__ = "0.1.0"
+          EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - name: Build wheel
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync
+          uv run --with build python -m build
+
+      - name: Verify wheel produced
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f dist/*.whl ]; then
+            echo "FAIL: no wheel produced"
+            exit 1
+          fi
+          echo "OK: wheel produced"
+
+  test-publish-npm-synthetic:
+    name: Synthetic npm Publish Test
+    needs: validate-workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Create minimal package.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+
+          cat > "$TEST_DIR/package.json" << 'EOF'
+          {
+            "name": "test-pkg",
+            "version": "0.1.0",
+            "scripts": {
+              "build": "echo 'build success'"
+            }
+          }
+          EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - name: Run build stub
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          echo "OK: build step completed"
+
+  test-publish-cargo-synthetic:
+    name: Synthetic Cargo Publish Test
+    needs: validate-workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Create minimal Rust crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_DIR=$(mktemp -d)
+          # NOTE: temp dir cleaned up by runner
+          mkdir -p "$TEST_DIR/src"
+
+          cat > "$TEST_DIR/Cargo.toml" << 'EOF'
+          [package]
+          name = "test-pkg"
+          version = "0.1.0"
+          edition = "2021"
+          EOF
+
+          cat > "$TEST_DIR/src/main.rs" << 'EOF'
+          fn main() {
+              println!("hello");
+          }
+          EOF
+
+          echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
+
+      - name: Build release
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release
+
+      - name: Verify binary produced
+        working-directory: ${{ env.TEST_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f "$TEST_DIR/target/release/test-pkg" ]; then
+            echo "FAIL: no binary produced"
+            exit 1
+          fi
+          echo "OK: binary produced"
+
+  self-ci:
+    name: self-ci
+    needs:
+      - validate-workflows
+      - test-ci-python-synthetic
+      - test-ci-typescript-synthetic
+      - test-ci-go-synthetic
+      - test-ci-rust-synthetic
+      - test-doc-quality-synthetic
+      - test-starter-checks-synthetic
+      - test-publish-pypa-synthetic
+      - test-publish-npm-synthetic
+      - test-publish-cargo-synthetic
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "All self-ci jobs passed"

@@ -17,7 +17,7 @@ on:
       node-version:
         description: "Node.js version"
         type: string
-        default: "20"
+        default: "22"
       package-manager:
         description: "Package manager: npm, pnpm, or yarn"
         type: string

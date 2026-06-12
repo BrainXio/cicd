@@ -9,7 +9,7 @@ on:
       toolchain:
         description: "Rust toolchain version"
         type: string
-        default: "1.87.0"
+        default: "stable"
       clippy-deny-warnings:
         description: "Treat clippy warnings as errors"
         type: boolean
@@ -36,6 +36,7 @@ jobs:
 
   clippy:
     name: Clippy Lints
+    needs: fmt
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -48,9 +49,10 @@ jobs:
         env:
           DENY_WARNINGS: ${{ inputs.clippy-deny-warnings }}
         run: |
+          set -euo pipefail
           case "$DENY_WARNINGS" in
-            true|false|True|False|TRUE|FALSE|1|0|yes|no|Yes|No|YES|NO) ;;
-            *) echo "ERROR: invalid boolean value for clippy-deny-warnings: $DENY_WARNINGS" >&2; exit 1 ;;
+            true|True|TRUE|1|yes|Yes|YES) DENY_WARNINGS="true" ;;
+            *) DENY_WARNINGS="false" ;;
           esac
           if [ "$DENY_WARNINGS" = "true" ]; then
             cargo clippy --all-targets -- -D warnings
@@ -60,6 +62,7 @@ jobs:
 
   test:
     name: Test
+    needs: clippy
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -71,6 +74,7 @@ jobs:
 
   build-release:
     name: Build Release
+    needs: test
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -83,6 +87,7 @@ jobs:
   audit:
     name: Security Audit
     if: ${{ inputs.run-audit }}
+    needs: build-release
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -90,6 +95,6 @@ jobs:
           language: rust
           version: ${{ inputs.toolchain }}
 
-      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+      - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

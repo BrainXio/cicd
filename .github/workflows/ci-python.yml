@@ -67,15 +67,21 @@ jobs:
       - name: Sync dependencies
         if: ${{ inputs.extra-deps != '' }}
         shell: bash
-        run: uv sync --extra ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          set -euo pipefail
+          uv sync --extra "$EXTRA_DEPS"
 
       - name: Sync base dependencies
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
       - name: Run gitleaks detect
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
@@ -85,21 +91,33 @@ jobs:
           SRC_PATH: ${{ inputs.src-path }}
           TEST_PATH: ${{ inputs.test-path }}
         run: |
-          [[ "$SRC_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid src-path" >&2; exit 1; }
-          [[ "$TEST_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid test-path" >&2; exit 1; }
+          set -euo pipefail
+          if [[ "$SRC_PATH" =~ ^/|\.\. ]] || [[ ! "$SRC_PATH" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+            echo "ERROR: invalid src-path" >&2
+            exit 1
+          fi
+          if [[ "$TEST_PATH" =~ ^/|\.\. ]] || [[ ! "$TEST_PATH" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+            echo "ERROR: invalid test-path" >&2
+            exit 1
+          fi
           echo "SRC_PATH=$SRC_PATH" >> "$GITHUB_ENV"
           echo "TEST_PATH=$TEST_PATH" >> "$GITHUB_ENV"
 
       - name: Run ruff check
         shell: bash
-        run: uv run ruff check "$SRC_PATH"/ "$TEST_PATH"/
+        run: |
+          set -euo pipefail
+          uv run ruff check "$SRC_PATH"/ "$TEST_PATH"/
 
       - name: Run ruff format check
         shell: bash
-        run: uv run ruff format --check "$SRC_PATH"/ "$TEST_PATH"/
+        run: |
+          set -euo pipefail
+          uv run ruff format --check "$SRC_PATH"/ "$TEST_PATH"/
 
   typecheck:
     name: Type Check
+    needs: lint
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -110,12 +128,18 @@ jobs:
       - name: Sync dependencies
         if: ${{ inputs.extra-deps != '' }}
         shell: bash
-        run: uv sync --extra ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          set -euo pipefail
+          uv sync --extra "$EXTRA_DEPS"
 
       - name: Sync base dependencies
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
       - name: Determine mypy target
         id: mypy-target
@@ -124,11 +148,8 @@ jobs:
           MYPY_TARGET_INPUT: ${{ inputs.mypy-target }}
           SRC_PATH: ${{ inputs.src-path }}
         run: |
+          set -euo pipefail
           if [ -n "$MYPY_TARGET_INPUT" ]; then
-            if [[ ! "$MYPY_TARGET_INPUT" =~ ^[a-zA-Z0-9_/.-]+$ ]]; then
-              echo "ERROR: mypy-target input contains invalid characters: $MYPY_TARGET_INPUT" >&2
-              exit 1
-            fi
             echo "target=$MYPY_TARGET_INPUT" >> "$GITHUB_OUTPUT"
           else
             echo "target=$SRC_PATH" >> "$GITHUB_OUTPUT"
@@ -138,10 +159,13 @@ jobs:
         shell: bash
         env:
           MYPY_TARGET: ${{ steps.mypy-target.outputs.target }}
-        run: uv run mypy "$MYPY_TARGET" --strict
+        run: |
+          set -euo pipefail
+          uv run mypy "$MYPY_TARGET" --strict
 
   test:
     name: Test and Coverage
+    needs: [lint, typecheck]
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -152,12 +176,18 @@ jobs:
       - name: Sync dependencies
         if: ${{ inputs.extra-deps != '' }}
         shell: bash
-        run: uv sync --extra ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          set -euo pipefail
+          uv sync --extra "$EXTRA_DEPS"
 
       - name: Sync base dependencies
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
       - name: Run tests with coverage
         shell: bash
@@ -165,6 +195,7 @@ jobs:
           COVERAGE_SOURCE: ${{ inputs.coverage-source }}
           COVERAGE_FAIL_UNDER: ${{ inputs.coverage-fail-under }}
         run: |
+          set -euo pipefail
           if [ -n "$COVERAGE_SOURCE" ]; then
             uv run pytest --cov="$COVERAGE_SOURCE" --cov-report=term-missing --cov-fail-under="$COVERAGE_FAIL_UNDER" -q
           else
@@ -173,6 +204,7 @@ jobs:
 
   build-verify:
     name: Build Verify
+    needs: test
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -183,14 +215,24 @@ jobs:
       - name: Sync dependencies
         if: ${{ inputs.extra-deps != '' }}
         shell: bash
-        run: uv sync --extra ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          set -euo pipefail
+          uv sync --extra "$EXTRA_DEPS"
 
       - name: Sync base dependencies
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
-      - run: uv run python -m build
+      - name: Build package
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python -m build
 
       - name: Verify wheel entry points
         if: ${{ inputs.wheel-entry-points != '' }}
@@ -198,7 +240,8 @@ jobs:
         env:
           ENTRY_POINTS: ${{ inputs.wheel-entry-points }}
         run: |
-          python3 -c "
+          set -euo pipefail
+          uv run python -c "
           import configparser, glob, os, sys, zipfile
           entry_points = os.environ['ENTRY_POINTS'].split()
           if not entry_points:
@@ -229,6 +272,7 @@ jobs:
   mcp-integration:
     name: MCP Server Integration
     if: ${{ inputs.run-mcp-integration }}
+    needs: test
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
@@ -239,12 +283,18 @@ jobs:
       - name: Sync dependencies
         if: ${{ inputs.extra-deps != '' }}
         shell: bash
-        run: uv sync --extra ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          set -euo pipefail
+          uv sync --extra "$EXTRA_DEPS"
 
       - name: Sync base dependencies
         if: ${{ inputs.extra-deps == '' }}
         shell: bash
-        run: uv sync
+        run: |
+          set -euo pipefail
+          uv sync
 
       - name: Run MCP integration tests
         shell: bash
@@ -252,6 +302,7 @@ jobs:
           MCP_ENV_VARS: ${{ inputs.mcp-env-vars }}
           MCP_TEST_PATH: ${{ inputs.mcp-test-path }}
         run: |
+          set -euo pipefail
           if [ -n "$MCP_ENV_VARS" ]; then
             while IFS='=' read -r key value; do
               key="${key#"${key%%[![:space:]]*}"}"
@@ -260,8 +311,11 @@ jobs:
                 echo "ERROR: invalid env var name: $key" >&2
                 exit 1
               fi
-              export "$key=$value"
+              if [[ "$value" =~ [\`\$\(\)] ]]; then
+                echo "ERROR: env var value contains invalid characters" >&2
+                exit 1
+              fi
+              printf '%s\n' "$key=$value" >> "$GITHUB_ENV"
             done <<< "$MCP_ENV_VARS"
           fi
-          [[ "$MCP_TEST_PATH" =~ ^[a-zA-Z0-9_/.-]+$ ]] || { echo "ERROR: invalid test path" >&2; exit 1; }
           uv run pytest "$MCP_TEST_PATH"/ -v
