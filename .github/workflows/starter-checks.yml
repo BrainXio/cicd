@@ -67,19 +67,19 @@ jobs:
         run: |
           set -euo pipefail
           # Skip commitlint if before SHA is all zeros (new branch/repo)
-          if [ -z "$GITHUB_EVENT_BEFORE" ] || [ "$GITHUB_EVENT_BEFORE" = "0000000000000000000000000000000000000000" ]; then
+          if [ -z "${GITHUB_EVENT_BEFORE:-}" ] || [ "${GITHUB_EVENT_BEFORE:-}" = "0000000000000000000000000000000000000000" ]; then
             echo "skipped=true" >> "$GITHUB_OUTPUT"
             echo "No common ancestor: before SHA is all zeros or empty (force-pushed new root)"
             exit 0
           fi
 
           # Check if before and after SHAs have a common ancestor
-          if git merge-base --is-ancestor "$GITHUB_EVENT_BEFORE" "$GITHUB_EVENT_AFTER" 2>/dev/null; then
+          if git merge-base --is-ancestor "${GITHUB_EVENT_BEFORE:-}" "${GITHUB_EVENT_AFTER:-}" 2>/dev/null; then
             echo "skipped=false" >> "$GITHUB_OUTPUT"
           else
             # No common ancestor - skip commitlint check
             echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "No common ancestor between $GITHUB_EVENT_BEFORE and $GITHUB_EVENT_AFTER - skipping commitlint"
+            echo "No common ancestor between ${GITHUB_EVENT_BEFORE:-} and ${GITHUB_EVENT_AFTER:-} - skipping commitlint"
           fi
 
       - name: Commitlint
