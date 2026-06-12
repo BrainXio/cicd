@@ -1,0 +1,138 @@
+name: CI Templates
+# === Consumer reusable workflow ===
+# Always call via: uses: brainxio/cicd/.github/workflows/ci-templates.yml@v1
+# Do NOT copy the file unless you intend to fork.
+
+on:
+  workflow_call:
+    inputs:
+      yaml-paths:
+        description: "Paths/globs for YAML validation (space-separated)"
+        type: string
+        default: "."
+      template-paths:
+        description: "Paths for Jinja2 template validation (space-separated)"
+        type: string
+        default: "templates/"
+      python-version:
+        description: "Python version for validation jobs"
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-yaml:
+    name: Validate YAML
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Validate YAML files
+        shell: bash
+        env:
+          YAML_PATHS: "${{ inputs.yaml-paths }}"
+        run: |
+          set -euo pipefail
+          uv run --with pyyaml python -c "
+          import sys
+          import yaml
+          from pathlib import Path
+
+          yaml_paths = sys.argv[1].split()
+          errors = []
+
+          for base_path in yaml_paths:
+              base = Path(base_path)
+              if not base.exists():
+                  continue
+              for pattern in ['**/*.yml', '**/*.yaml']:
+                  for file in base.glob(pattern):
+                      if '.git' in str(file.parts):
+                          continue
+                      try:
+                          with open(file, 'r') as f:
+                              yaml.safe_load(f)
+                          print(f'OK: {file}')
+                      except yaml.YAMLError as e:
+                          errors.append(f'ERROR: {file}: {e}')
+
+          if errors:
+              for err in errors:
+                  print(err)
+              sys.exit(1)
+          print('All YAML files valid')
+          " "$YAML_PATHS"
+
+  validate-jinja:
+    name: Validate Jinja2
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Validate Jinja2 templates
+        shell: bash
+        env:
+          TEMPLATE_PATHS: "${{ inputs.template-paths }}"
+        run: |
+          set -euo pipefail
+          uv run --with jinja2 python -c "
+          import sys
+          from pathlib import Path
+          from jinja2 import Environment, FileSystemLoader, TemplateSyntaxError
+
+          template_paths = sys.argv[1].split()
+          errors = []
+          env = Environment(loader=FileSystemLoader('.'))
+
+          for base_path in template_paths:
+              base = Path(base_path)
+              if not base.exists():
+                  print(f'SKIP: {base_path} (does not exist)')
+                  continue
+              for pattern in ['**/*.jinja', '**/*.jinja2']:
+                  for file in base.glob(pattern):
+                      if '.git' in str(file.parts):
+                          continue
+                      try:
+                          with open(file, 'r') as f:
+                              source = f.read()
+                          env.parse(source)
+                          print(f'OK: {file}')
+                      except TemplateSyntaxError as e:
+                          errors.append(f'ERROR: {file}: {e.message} at line {e.lineno}')
+                      except Exception as e:
+                          errors.append(f'ERROR: {file}: {e}')
+
+          if errors:
+              for err in errors:
+                  print(err)
+              sys.exit(1)
+          print('All Jinja2 templates valid')
+          " "$TEMPLATE_PATHS"
+
+  doc-quality:
+    name: Doc Quality
+    uses: ./.github/workflows/doc-quality.yml
+    with:
+      md-paths: "."
+      yaml-paths: "${{ inputs.yaml-paths }}"
+
+  starter-checks:
+    name: Starter Checks
+    uses: ./.github/workflows/starter-checks.yml
+    with:
+      check-commit-messages: true
