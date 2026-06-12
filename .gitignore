@@ -1,0 +1,29 @@
+# Deny everything by default
+*
+
+# Allow specific directories and files
+!.gitignore
+!.github/
+!.github/**
+!docs/
+!docs/**
+!.githooks/
+!.githooks/**
+!README.md
+
+# Deny common artifacts that might slip through
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.env
+.env.*
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+*.p12

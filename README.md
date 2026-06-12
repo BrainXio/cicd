@@ -32,6 +32,17 @@ jobs:
 | `sync-defaults.yml`         | Sync labels and defaults across repos                  |
 | `self-ci.yml`               | Validate workflows and run synthetic integration tests |
 
+## Documentation
+
+Full documentation follows the [Diataxis](https://diataxis.fr/) framework:
+
+- [Tutorials](docs/tutorials/getting-started.md) — Learning-oriented step-by-step guides
+- [How-To Guides](docs/how-to-guides/) — Problem-oriented guides for specific tasks
+- [Reference](docs/reference/workflow-inputs.md) — Complete input tables and API reference
+- [Explanation](docs/explanation/architecture.md) — Background knowledge and design rationale
+
+See [docs/index.md](docs/index.md) for the documentation landing page.
+
 ## Versioning
 
 - Tags follow semantic versioning: `v1.0.0`, `v1.1.0`, etc.
