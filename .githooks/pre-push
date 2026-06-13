@@ -21,7 +21,6 @@ ATTRIBUTION_PATTERNS=(
   "# AI[- ]generated"
   "[Aa]ssisted[- ]by[- ](Claude|ChatGPT|Copilot|Gemini|Grok|LLaMA)"
   "[Uu]sing[- ](Claude|ChatGPT|Copilot|Gemini|Grok|LLaMA)"
-  "model: (claude|gpt|copilot|gemini|grok|llama)"
   "llm[- ]generated"
   "language[- ]model[- ]generated"
 )

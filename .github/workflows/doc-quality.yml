@@ -14,6 +14,10 @@ on:
         description: "Paths for yamllint"
         type: string
         default: ".github"
+      yamllint-config:
+        description: "Path to yamllint config (empty for auto-discovery)"
+        type: string
+        default: ""
       typos-config:
         description: "Path to .typos.toml (empty to skip typos check)"
         type: string
@@ -59,9 +63,14 @@ jobs:
         shell: bash
         env:
           YAML_PATHS: ${{ inputs.yaml-paths }}
+          YAMLLINT_CONFIG: ${{ inputs.yamllint-config }}
         run: |
           set -euo pipefail
-          uv run --with yamllint yamllint $YAML_PATHS
+          if [ -n "$YAMLLINT_CONFIG" ]; then
+            uv run --with yamllint yamllint -c "$YAMLLINT_CONFIG" $YAML_PATHS
+          else
+            uv run --with yamllint yamllint $YAML_PATHS
+          fi
 
   typos:
     name: Spell Check

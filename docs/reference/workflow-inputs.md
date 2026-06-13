@@ -52,6 +52,16 @@ Rust CI workflow inputs.
 | `clippy-deny-warnings` | boolean | `true`     | Treat clippy warnings as errors            |
 | `run-audit`            | boolean | `false`    | Run cargo audit for vulnerability scanning |
 
+## ci-templates.yml
+
+Template-only repository CI workflow inputs.
+
+| Input            | Type   | Default       | Description                                          |
+| ---------------- | ------ | ------------- | ---------------------------------------------------- |
+| `yaml-paths`     | string | `"."`         | Paths/globs for YAML validation (space-separated)   |
+| `template-paths` | string | `"templates/"`| Paths for Jinja2 template validation (space-separated) |
+| `python-version` | string | `"3.12"`      | Python version for validation jobs                   |
+
 ## publish-pypa.yml
 
 Python package publishing workflow inputs and secrets.
@@ -97,6 +107,7 @@ Documentation quality workflow inputs.
 | ------------------ | ------- | ----------- | ----------------------------------------------- |
 | `md-paths`         | string  | `"."`       | Paths/globs for mdformat (space-separated)      |
 | `yaml-paths`       | string  | `".github"` | Paths for yamllint                              |
+| `yamllint-config`  | string  | `""`        | Path to yamllint config (empty for auto-discovery) |
 | `typos-config`     | string  | `""`        | Path to .typos.toml (empty to skip typos check) |
 | `link-check-paths` | string  | `""`        | Paths for lychee link check (empty to skip)     |
 | `link-check-base`  | string  | `"."`       | Base path for relative link resolution          |

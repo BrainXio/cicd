@@ -55,7 +55,7 @@ jobs:
                   continue
               for pattern in ['**/*.yml', '**/*.yaml']:
                   for file in base.glob(pattern):
-                      if '.git' in str(file.parts):
+                      if '.git' in str(file.parts) or '.github' in str(file.parts):
                           continue
                       try:
                           with open(file, 'r') as f:
@@ -105,7 +105,7 @@ jobs:
                   continue
               for pattern in ['**/*.jinja', '**/*.jinja2']:
                   for file in base.glob(pattern):
-                      if '.git' in str(file.parts):
+                      if '.git' in str(file.parts) or '.github' in str(file.parts):
                           continue
                       try:
                           with open(file, 'r') as f:
