@@ -27,3 +27,4 @@ credentials/
 *.key
 *.crt
 *.p12
+Makefile
