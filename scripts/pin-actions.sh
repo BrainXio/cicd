@@ -130,6 +130,7 @@ for workflow_file in "${workflow_files[@]}"; do
 
     # Process the file line by line
     # We need to be careful with the end of file condition
+    # IMPORTANT: All log statements must use >&2 to avoid writing to temp file
     {
         while IFS= read -r line; do
             # Check if line contains a "uses:" directive with an external action
@@ -141,7 +142,7 @@ for workflow_file in "${workflow_files[@]}"; do
 
                 # Skip internal BrainXio actions (starting with brainxio/)
                 if [[ "$action_name" == brainxio/* ]]; then
-                    log "  Skipping internal action: $full_action"
+                    log "  Skipping internal action: $full_action" >&2
                     echo "$line"
                     continue
                 fi
@@ -154,11 +155,11 @@ for workflow_file in "${workflow_files[@]}"; do
                     # We need to be careful to preserve the exact indentation and formatting
                     new_line="${line/$full_action/$action_name@$hash}"
                     echo "$new_line"
-                    log "  Pinned $full_action -> $action_name@$hash"
+                    log "  Pinned $full_action -> $action_name@$hash" >&2
                     ((actions_pinned++))
                     file_modified=1
                 else
-                    log_warn "  No SHA-1 hash found for $full_action in registry"
+                    log_warn "  No SHA-1 hash found for $full_action in registry" >&2
                     echo "$line"
                 fi
             else
@@ -177,7 +178,7 @@ for workflow_file in "${workflow_files[@]}"; do
 
                 # Skip internal BrainXio actions (starting with brainxio/)
                 if [[ "$action_name" == brainxio/* ]]; then
-                    log "  Skipping internal action: $full_action"
+                    log "  Skipping internal action: $full_action" >&2
                     echo -n "$line"
                 fi
 
@@ -189,11 +190,11 @@ for workflow_file in "${workflow_files[@]}"; do
                     # We need to be careful to preserve the exact indentation and formatting
                     new_line="${line/$full_action/$action_name@$hash}"
                     echo -n "$new_line"
-                    log "  Pinned $full_action -> $action_name@$hash"
+                    log "  Pinned $full_action -> $action_name@$hash" >&2
                     ((actions_pinned++))
                     file_modified=1
                 else
-                    log_warn "  No SHA-1 hash found for $full_action in registry"
+                    log_warn "  No SHA-1 hash found for $full_action in registry" >&2
                     echo -n "$line"
                 fi
             else
