@@ -1,6 +1,5 @@
 name: Starter Checks
 # === Consumer reusable workflow ===
-  Skipping internal action: brainxio/cicd/.github/workflows/starter-checks.yml@v1
 # Always call via: uses: brainxio/cicd/.github/workflows/starter-checks.yml@v1
 # Do NOT copy the file unless you intend to fork.
 
@@ -21,13 +20,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - uses: trufflesecurity/trufflehog@d411fff7b8879a62509f3fa98c07f247ac089a51
-  Pinned trufflesecurity/trufflehog@v3.95.5 -> trufflesecurity/trufflehog@d411fff7b8879a62509f3fa98c07f247ac089a51
         with:
           extra_args: --only-verified
 
@@ -36,7 +33,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -61,7 +57,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -90,7 +85,6 @@ jobs:
       - name: Commitlint
         if: steps.common-ancestor.outputs.skipped != 'true'
         uses: wagoid/commitlint-github-action@f133a0d95090ef2609192b4a21f54e20af819ea9
-  Pinned wagoid/commitlint-github-action@v6 -> wagoid/commitlint-github-action@f133a0d95090ef2609192b4a21f54e20af819ea9
         with:
           failOnWarnings: true
           helpURL: ""
@@ -103,7 +97,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
           persist-credentials: false

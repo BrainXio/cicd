@@ -15,12 +15,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
-  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           enable-cache: true
 
@@ -60,7 +58,6 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -108,7 +105,6 @@ jobs:
           echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
-  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           python-version: "3.10"
           enable-cache: true
@@ -150,7 +146,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -217,7 +212,6 @@ jobs:
           echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-  Pinned actions/setup-node@v5 -> actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "22"
 
@@ -262,7 +256,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -308,7 +301,6 @@ jobs:
           echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
-  Pinned actions/setup-go@v6 -> actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
           go-version: "1.24"
 
@@ -355,7 +347,6 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -383,7 +374,6 @@ jobs:
           echo "TEST_DIR=$TEST_DIR" >> "$GITHUB_ENV"
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
-  Pinned dtolnay/rust-toolchain@stable -> dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
           components: clippy,rustfmt
 
@@ -421,12 +411,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
-  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           enable-cache: true
 
@@ -480,7 +468,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
@@ -520,12 +507,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
-  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           enable-cache: true
 
@@ -579,12 +564,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-  Pinned actions/setup-node@v5 -> actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "22"
 
@@ -621,12 +604,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
-  Pinned dtolnay/rust-toolchain@stable -> dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
 
       - name: Create minimal Rust crate
         shell: bash

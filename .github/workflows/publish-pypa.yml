@@ -1,6 +1,5 @@
 name: Publish Python Package
 # === Consumer reusable workflow ===
-  Skipping internal action: brainxio/cicd/.github/workflows/publish-pypa.yml@v1
 # Always call via: uses: brainxio/cicd/.github/workflows/publish-pypa.yml@v1
 # Do NOT copy the file unless you intend to fork.
 
@@ -30,12 +29,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
-  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           enable-cache: true
 
@@ -53,14 +50,12 @@ jobs:
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-  Pinned actions/upload-artifact@v4 -> actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: dist
           path: dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
-  Pinned softprops/action-gh-release@v2 -> softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           files: dist/*
           generate_release_notes: true
