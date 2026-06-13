@@ -10,6 +10,7 @@
 !.githooks/
 !.githooks/**
 !README.md
+!Makefile
 
 # Deny common artifacts that might slip through
 *.log
@@ -27,4 +28,3 @@ credentials/
 *.key
 *.crt
 *.p12
-Makefile
