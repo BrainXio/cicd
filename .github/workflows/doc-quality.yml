@@ -1,5 +1,6 @@
 name: Doc Quality
 # === Consumer reusable workflow ===
+  Skipping internal action: brainxio/cicd/.github/workflows/doc-quality.yml@v1
 # Always call via: uses: brainxio/cicd/.github/workflows/doc-quality.yml@v1
 # Do NOT copy the file unless you intend to fork.
 
@@ -43,11 +44,13 @@ jobs:
     name: Lint and Format Check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
+  Pinned astral-sh/setup-uv@v7 -> astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
         with:
           enable-cache: true
 
@@ -77,11 +80,13 @@ jobs:
     if: ${{ inputs.typos-config != '' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - uses: crate-ci/typos@v1
+      - uses: crate-ci/typos@d80b8e26878e372a041833cd67163dbdb6a4336e
+  Pinned crate-ci/typos@v1 -> crate-ci/typos@d80b8e26878e372a041833cd67163dbdb6a4336e
         with:
           config: ${{ inputs.typos-config }}
 
@@ -91,11 +96,13 @@ jobs:
     runs-on: ubuntu-24.04
     continue-on-error: ${{ !inputs.link-check-fail }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+  Pinned actions/checkout@v6 -> actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - uses: lycheeverse/lychee-action@v2
+      - uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
+  Pinned lycheeverse/lychee-action@v2 -> lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411
         with:
           args: --base ${{ inputs.link-check-base }} ${{ inputs.link-check-paths }}
           fail: ${{ inputs.link-check-fail }}

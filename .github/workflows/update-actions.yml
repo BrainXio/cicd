@@ -1,0 +1,94 @@
+# Update GitHub Actions
+#
+# This workflow checks for updates to pinned GitHub Actions and creates PRs when updates are available.
+# It runs on a schedule and can also be triggered manually.
+#
+# Required secrets:
+# - GITHUB_TOKEN: GitHub token with appropriate permissions
+
+name: Update GitHub Actions
+
+on:
+  schedule:
+    # Run weekly on Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no PRs created)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-updates:
+    name: Check for Action Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v4
+
+      - name: Setup environment
+        run: |
+          # Install dependencies
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Check for updates
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          # Run the update check script
+          chmod +x ./scripts/check-action-updates.sh
+          ./scripts/check-action-updates.sh
+
+      - name: Create Pull Request
+        if: steps.check.outcome == 'success' && env.DRY_RUN == 'false'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(ci): update GitHub Actions to latest versions\n\nAutomated update of GitHub Actions to their latest versions.\n\nSee action update report for details."
+          title: 'chore(ci): update GitHub Actions to latest versions'
+          body: |
+            ## GitHub Actions Update
+
+            This PR updates GitHub Actions to their latest versions to ensure we're using the most recent features and security fixes.
+
+            Please review the changes and ensure all workflows continue to function as expected.
+
+            ### Release Notes
+
+            Release notes for each updated action can be found in the action update report.
+
+            ### Security Considerations
+
+            All updated actions have been checked for security advisories. Please review any flagged advisories before merging.
+
+            ### Testing
+
+            - [ ] All CI workflows pass with updated actions
+            - [ ] No breaking changes observed
+            - [ ] Security scan passes
+          branch: action-updates-${{ github.run_number }}
+          delete-branch: true
+          labels: |
+            ci
+            dependencies
+            automated-pr
+
+      - name: Summary
+        run: |
+          echo "## GitHub Actions Update Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "The update check has completed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If updates were found, a PR has been created with the changes." >> $GITHUB_STEP_SUMMARY
+          echo "Please review and merge the PR after verifying the updates are safe." >> $GITHUB_STEP_SUMMARY

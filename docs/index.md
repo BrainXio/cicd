@@ -21,6 +21,7 @@ Problem-oriented guides for specific tasks.
 - [Use TypeScript CI Workflow](how-to-guides/use-ci-typescript.md)
 - [Publish to PyPI](how-to-guides/publish-to-pypi.md)
 - [Publish to npm](how-to-guides/publish-to-npm.md)
+- [Maintain GitHub Actions](how-to-guides/maintain-actions.md) — Update and maintain pinned actions
 
 ### Reference
 
@@ -34,4 +35,4 @@ Information-oriented descriptions of all options and interfaces.
 Understanding-oriented background knowledge.
 
 - [Architecture](explanation/architecture.md) — How the reusable workflow system works
-- [Security Model](explanation/security-model.md) — Design decisions and threat mitigations
+- [Security Model](explanation/security-model.md) — Supply chain security approach and rationale

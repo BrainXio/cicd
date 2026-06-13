@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # Allowed namespaces (bash array)
-ALLOWED_NAMESPACES=("brainxio")
+ALLOWED_NAMESPACES=("BrainXio" "brainxio")
 
 echo "Running pre-commit validation..."
 
@@ -107,6 +107,22 @@ except TemplateSyntaxError as e:
     fi
   fi
 done
+
+# ====================== GITHUB ACTIONS PINNING VALIDATION ======================
+echo "Validating GitHub Actions pinning..."
+workflow_files=$(echo "$staged_files" | grep -E '^\.github/workflows/.*\.(ya?ml|yaml)$' || true)
+
+if [ -n "$workflow_files" ]; then
+  validate_script="$(dirname "$0")/../scripts/validate-action-pinning.sh"
+  if [ -f "$validate_script" ]; then
+    if ! "$validate_script" $workflow_files; then
+      echo "ERROR: GitHub Actions pinning validation failed." >&2
+      errors=$((errors + 1))
+    fi
+  else
+    echo "WARNING: Validation script not found: $validate_script" >&2
+  fi
+fi
 
 # ====================== SUMMARY ======================
 if [ "$errors" -gt 0 ]; then

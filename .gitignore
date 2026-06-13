@@ -9,6 +9,8 @@
 !docs/**
 !.githooks/
 !.githooks/**
+!scripts/
+!scripts/**
 !README.md
 !Makefile
 !CHANGELOG.md
@@ -29,3 +31,5 @@ credentials/
 *.key
 *.crt
 *.p12
+data/bus/
+*.jsonl
