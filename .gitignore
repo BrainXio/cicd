@@ -11,6 +11,7 @@
 !.githooks/**
 !README.md
 !Makefile
+!CHANGELOG.md
 
 # Deny common artifacts that might slip through
 *.log
