@@ -117,7 +117,6 @@ jobs:
 
   typecheck:
     name: Type Check
-    needs: lint
     runs-on: ubuntu-24.04
     steps:
       - uses: brainxio/actions/common-setup@v1
